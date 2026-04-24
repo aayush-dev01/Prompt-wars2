@@ -1,6 +1,6 @@
-# Prompt Wars
+# ElectED
 
-Prompt Wars is a React + Vite civic education app focused on helping people understand elections in a calm, practical, and nonpartisan way. It combines interactive learning, multilingual UI support, and Gemini-powered assistance for things like voter planning, claim checking, and document explanation.
+ElectED is a React + Vite civic education app focused on helping people understand elections in a calm, practical, and nonpartisan way. It combines interactive learning, multilingual UI support, and Gemini-powered assistance for things like voter planning, claim checking, and document explanation.
 
 ## What it includes
 

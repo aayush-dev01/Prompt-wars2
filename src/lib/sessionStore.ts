@@ -25,8 +25,8 @@ export type SavedSession = {
 
 type NewSavedSession = Omit<SavedSession, 'id' | 'createdAt'>;
 
-const STORAGE_KEY = 'prompt-wars-saved-sessions';
-const COLLECTION_NAME = 'promptWarsSessions';
+const STORAGE_KEY = 'elected-saved-sessions';
+const COLLECTION_NAME = 'electEDSessions';
 
 const isSavedSessionKind = (value: unknown): value is SavedSessionKind =>
   typeof value === 'string' &&

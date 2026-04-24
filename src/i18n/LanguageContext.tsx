@@ -10,7 +10,7 @@ type LanguageContextValue = {
   isRtl: boolean;
 };
 
-const STORAGE_KEY = 'prompt-wars-language';
+const STORAGE_KEY = 'elected-language';
 
 const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
 
