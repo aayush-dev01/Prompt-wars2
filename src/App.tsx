@@ -1,18 +1,30 @@
-import { Suspense, lazy } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Suspense, lazy, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
-import AIAssistant from './components/AIAssistant';
+import { trackPageView } from './lib/firebase';
 
 const Home = lazy(() => import('./pages/Home'));
 const Process = lazy(() => import('./pages/Process'));
 const Quiz = lazy(() => import('./pages/Quiz'));
 const Guide = lazy(() => import('./pages/Guide'));
 const ActionCenter = lazy(() => import('./pages/ActionCenter'));
+const AIAssistant = lazy(() => import('./components/AIAssistant'));
+
+const RouteTelemetry = () => {
+  const location = useLocation();
+
+  useEffect(() => {
+    void trackPageView(location.pathname + location.search, document.title);
+  }, [location.pathname, location.search]);
+
+  return null;
+};
 
 function App() {
   return (
     <Router>
+      <RouteTelemetry />
       <div className="min-h-screen flex flex-col bg-background text-foreground transition-colors duration-300">
         <a
           href="#main-content"
@@ -43,7 +55,9 @@ function App() {
           </Suspense>
         </main>
         <Footer />
-        <AIAssistant />
+        <Suspense fallback={null}>
+          <AIAssistant />
+        </Suspense>
       </div>
     </Router>
   );

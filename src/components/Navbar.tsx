@@ -1,14 +1,19 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Menu, Moon, Sun, Vote, X } from 'lucide-react';
+import { Cloud, Loader2, LogIn, LogOut, Menu, Moon, Sun, Vote, X } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { languageLabels, supportedLanguages, type AppLanguage } from '../i18n/translations';
+import { hasGoogleAuth, signInWithGoogle, signOutFromGoogle } from '../lib/firebase';
+import { useGoogleAuthState } from '../hooks/useGoogleAuthState';
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [isDark, setIsDark] = useState(false);
+  const [authBusy, setAuthBusy] = useState(false);
+  const [authError, setAuthError] = useState('');
   const location = useLocation();
   const { language, setLanguage, labels } = useLanguage();
+  const { user, loading: authLoading } = useGoogleAuthState();
 
   const navLinks = [
     { name: labels.nav.home, path: '/' },
@@ -50,6 +55,27 @@ const Navbar = () => {
   };
 
   const isActive = (path: string) => location.pathname === path;
+
+  const handleGoogleAuth = async () => {
+    if (!hasGoogleAuth || authBusy) {
+      return;
+    }
+
+    setAuthBusy(true);
+    setAuthError('');
+
+    try {
+      if (user) {
+        await signOutFromGoogle();
+      } else {
+        await signInWithGoogle();
+      }
+    } catch (error) {
+      setAuthError(error instanceof Error ? error.message : 'Google Sign-In could not be completed.');
+    } finally {
+      setAuthBusy(false);
+    }
+  };
 
   return (
     <nav aria-label="Primary" className="fixed top-0 w-full z-50 glass border-b border-border transition-colors duration-300">
@@ -103,6 +129,18 @@ const Navbar = () => {
             </div>
 
             <button
+              onClick={handleGoogleAuth}
+              disabled={!hasGoogleAuth || authBusy || authLoading}
+              className="ml-2 inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-2 text-sm font-semibold text-foreground transition hover:border-primary/40 hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+              aria-label={user ? 'Sign out from Google' : 'Sign in with Google'}
+              title={hasGoogleAuth ? (user ? 'Cloud sync is active for your account.' : 'Sign in to enable Google-backed sync.') : 'Add Firebase config to enable Google Sign-In.'}
+            >
+              {authBusy || authLoading ? <Loader2 size={16} className="animate-spin" /> : user?.photoURL ? <img src={user.photoURL} alt="" className="h-4 w-4 rounded-full" /> : <Cloud size={16} />}
+              <span>{user ? user.displayName?.split(' ')[0] || 'Google account' : hasGoogleAuth ? 'Google Sign-In' : 'Google setup'}</span>
+              {user ? <LogOut size={14} /> : <LogIn size={14} />}
+            </button>
+
+            <button
               onClick={toggleTheme}
               className="ml-3 p-2 rounded-full hover:bg-secondary transition-colors"
               aria-label={isDark ? labels.nav.switchToLight : labels.nav.switchToDark}
@@ -148,6 +186,12 @@ const Navbar = () => {
         </div>
       </div>
 
+      {authError && !isOpen && (
+        <div className="border-t border-border bg-rose-50 px-4 py-2 text-center text-sm text-rose-700">
+          {authError}
+        </div>
+      )}
+
       {isOpen && (
         <div id="mobile-nav" className="md:hidden glass border-b border-border absolute w-full">
           <div className="px-4 pt-2 pb-4 space-y-2">
@@ -165,6 +209,19 @@ const Navbar = () => {
                 {link.name}
               </Link>
             ))}
+            <button
+              onClick={handleGoogleAuth}
+              disabled={!hasGoogleAuth || authBusy || authLoading}
+              className="flex w-full items-center justify-between rounded-2xl border border-border px-4 py-3 text-left text-base font-semibold text-foreground transition hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <span>{user ? `Connected: ${user.displayName || user.email || 'Google account'}` : hasGoogleAuth ? 'Sign in with Google' : 'Google setup required'}</span>
+              {authBusy || authLoading ? <Loader2 size={18} className="animate-spin" /> : user ? <LogOut size={18} /> : <LogIn size={18} />}
+            </button>
+            {authError && (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {authError}
+              </div>
+            )}
           </div>
         </div>
       )}

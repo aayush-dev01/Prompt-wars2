@@ -1,0 +1,9 @@
+.gcloud
+.git
+.gitignore
+dist
+node_modules
+*.log
+.env
+.env.local
+!.env.production

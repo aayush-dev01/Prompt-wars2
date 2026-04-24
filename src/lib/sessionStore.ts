@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, getDocs, orderBy, query } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore';
 import { firestore, hasFirebaseConfig } from './firebase';
 import type { Citation, GeminiModelName } from './gemini';
 import { sanitizeCitations } from './security';
@@ -21,6 +21,7 @@ export type SavedSession = {
   language: string;
   modelName: GeminiModelName;
   createdAt: number;
+  userId?: string;
 };
 
 type NewSavedSession = Omit<SavedSession, 'id' | 'createdAt'>;
@@ -54,7 +55,8 @@ const sanitizeSavedSession = (value: unknown): SavedSession | null => {
     typeof candidate.content !== 'string' ||
     typeof candidate.language !== 'string' ||
     typeof candidate.modelName !== 'string' ||
-    typeof candidate.createdAt !== 'number'
+    typeof candidate.createdAt !== 'number' ||
+    (candidate.userId !== undefined && typeof candidate.userId !== 'string')
   ) {
     return null;
   }
@@ -69,6 +71,7 @@ const sanitizeSavedSession = (value: unknown): SavedSession | null => {
     language: candidate.language,
     modelName: candidate.modelName as GeminiModelName,
     createdAt: candidate.createdAt,
+    userId: candidate.userId,
   };
 };
 
@@ -97,19 +100,22 @@ const writeLocalSessions = (sessions: SavedSession[]) => {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
 };
 
-export const loadSavedSessions = async () => {
-  if (firestore && hasFirebaseConfig) {
+export const loadSavedSessions = async (userId?: string) => {
+  if (firestore && hasFirebaseConfig && userId) {
     try {
-      const sessionsQuery = query(collection(firestore, COLLECTION_NAME), orderBy('createdAt', 'desc'));
+      const sessionsQuery = query(collection(firestore, COLLECTION_NAME), where('userId', '==', userId));
       const snapshot = await getDocs(sessionsQuery);
 
-      return snapshot.docs.map((item) => {
-        const data = item.data() as Omit<SavedSession, 'id'>;
-        return sanitizeSavedSession({
-          id: item.id,
-          ...data,
-        });
-      }).filter((session): session is SavedSession => Boolean(session));
+      return snapshot.docs
+        .map((item) => {
+          const data = item.data() as Omit<SavedSession, 'id'>;
+          return sanitizeSavedSession({
+            id: item.id,
+            ...data,
+          });
+        })
+        .filter((session): session is SavedSession => Boolean(session))
+        .sort((left, right) => right.createdAt - left.createdAt);
     } catch {
       return readLocalSessions();
     }
@@ -124,7 +130,7 @@ export const saveSession = async (session: NewSavedSession) => {
     createdAt: Date.now(),
   };
 
-  if (firestore && hasFirebaseConfig) {
+  if (firestore && hasFirebaseConfig && session.userId) {
     try {
       const ref = await addDoc(collection(firestore, COLLECTION_NAME), payload);
       return {
@@ -159,4 +165,5 @@ export const removeSession = async (id: string) => {
   writeLocalSessions(remainingSessions);
 };
 
-export const saveOriginLabel = hasFirebaseConfig ? 'Firestore + local fallback' : 'Local browser save';
+export const getSaveOriginLabel = (userId?: string) =>
+  hasFirebaseConfig && userId ? 'Firestore + local fallback' : 'Local browser save';

@@ -3,7 +3,9 @@ import { motion } from 'framer-motion';
 import {
   AlertTriangle,
   CheckCircle2,
+  Cloud,
   Copy,
+  Database,
   Download,
   ExternalLink,
   FileSearch,
@@ -13,6 +15,7 @@ import {
   LibraryBig,
   Link as LinkIcon,
   Loader2,
+  LogIn,
   MapPinned,
   Save,
   SearchCheck,
@@ -25,8 +28,10 @@ import { SCENARIO_PRESETS, TOOL_LABELS } from '../data/actionCenterData';
 import { fileToInlineData, formatGeminiError, generateGeminiText, GEMINI_MODELS, getGeminiApiKeys, type Citation, type GeminiModelName } from '../lib/gemini';
 import { sanitizeCitations, sanitizeDownloadFilename, validateUploadedDocument } from '../lib/security';
 import { downloadTextFile, copyText, shareText } from '../lib/share';
-import { loadSavedSessions, removeSession, saveOriginLabel, saveSession, type SavedSession, type SavedSessionKind } from '../lib/sessionStore';
+import { getSaveOriginLabel, loadSavedSessions, removeSession, saveSession, type SavedSession, type SavedSessionKind } from '../lib/sessionStore';
 import { useLanguage } from '../i18n/LanguageContext';
+import { hasFirebaseAnalytics, hasFirebaseStorage, hasGoogleAuth, signInWithGoogle, uploadFileToCloudStorage, uploadTextToCloudStorage } from '../lib/firebase';
+import { useGoogleAuthState } from '../hooks/useGoogleAuthState';
 
 type GeminiTextResult = Awaited<ReturnType<typeof generateGeminiText>>;
 
@@ -119,6 +124,7 @@ const ResultPanel = ({
   onCopy,
   onShare,
   onDownload,
+  onCloudSync,
 }: {
   title: string;
   modelName: GeminiModelName;
@@ -128,6 +134,7 @@ const ResultPanel = ({
   onCopy?: () => void;
   onShare?: () => void;
   onDownload?: () => void;
+  onCloudSync?: () => void;
 }) => {
   const safeCitations = sanitizeCitations(citations);
 
@@ -164,6 +171,12 @@ const ResultPanel = ({
             <button onClick={onDownload} className="rounded-full border border-border px-3 py-2 text-xs font-semibold transition hover:border-primary/40 hover:bg-secondary/60">
               <Download className="mr-1 inline h-3.5 w-3.5" />
               Export
+            </button>
+          )}
+          {onCloudSync && (
+            <button onClick={onCloudSync} className="rounded-full border border-border px-3 py-2 text-xs font-semibold transition hover:border-primary/40 hover:bg-secondary/60">
+              <Cloud className="mr-1 inline h-3.5 w-3.5" />
+              Sync to Google Cloud
             </button>
           )}
         </div>
@@ -203,11 +216,13 @@ const ActionCenter = () => {
   const apiKeys = getGeminiApiKeys();
   const hasApiKey = apiKeys.length > 0;
   const { labels, geminiLanguageLabel } = useLanguage();
+  const { user, loading: authLoading, isSignedIn } = useGoogleAuthState();
   const noticeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [saveNotice, setSaveNotice] = useState('');
   const [savedSessions, setSavedSessions] = useState<SavedSession[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  const [googleAuthError, setGoogleAuthError] = useState('');
 
   const [groundedQuestion, setGroundedQuestion] = useState('');
   const [groundedAnswer, setGroundedAnswer] = useState('');
@@ -235,6 +250,9 @@ const ActionCenter = () => {
   const [docModel, setDocModel] = useState<GeminiModelName>(GEMINI_MODELS[0]);
   const [docLoading, setDocLoading] = useState(false);
   const [docError, setDocError] = useState('');
+  const [docCloudPath, setDocCloudPath] = useState('');
+  const [docCloudUrl, setDocCloudUrl] = useState('');
+  const [docCloudLoading, setDocCloudLoading] = useState(false);
 
   const [claimText, setClaimText] = useState('');
   const [claimContext, setClaimContext] = useState('');
@@ -277,13 +295,13 @@ const ActionCenter = () => {
   useEffect(() => {
     const loadSessions = async () => {
       setSessionsLoading(true);
-      const sessions = await loadSavedSessions();
+      const sessions = await loadSavedSessions(user?.uid);
       setSavedSessions(sessions);
       setSessionsLoading(false);
     };
 
     void loadSessions();
-  }, []);
+  }, [user?.uid]);
 
   useEffect(() => () => {
     if (noticeTimeoutRef.current) {
@@ -294,6 +312,17 @@ const ActionCenter = () => {
   const ensureApiKey = () => {
     if (apiKeys.length === 0) {
       throw new Error('Missing Gemini API key. Add `VITE_GEMINI_API_KEY` or `VITE_GEMINI_API_KEYS` in `.env` to use the Action Center.');
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setGoogleAuthError('');
+
+    try {
+      await signInWithGoogle();
+      showNotice('Google account connected.');
+    } catch (error) {
+      setGoogleAuthError(error instanceof Error ? error.message : 'Google Sign-In could not be completed.');
     }
   };
 
@@ -320,9 +349,10 @@ const ActionCenter = () => {
       citations,
       language: geminiLanguageLabel,
       modelName,
+      userId: user?.uid,
     });
     setSavedSessions((current) => [saved, ...current.filter((item) => item.id !== saved.id)].slice(0, 40));
-    showNotice(`${title} saved.`);
+    showNotice(user?.uid ? `${title} saved to your Google-backed workspace.` : `${title} saved locally on this device.`);
   };
 
   const runCopy = async (title: string, content: string, citations: Citation[] = []) => {
@@ -345,6 +375,31 @@ const ActionCenter = () => {
   const runExport = (title: string, content: string, citations: Citation[] = []) => {
     downloadTextFile(sanitizeDownloadFilename(`${title}.txt`), buildExportBlock(title, content, citations));
     showNotice(`${title} exported.`);
+  };
+
+  const runCloudSync = async (title: string, content: string, citations: Citation[] = [], folder = 'action-center-exports') => {
+    if (!user?.uid) {
+      showNotice('Sign in with Google to sync this result to Cloud Storage.');
+      return;
+    }
+
+    if (!hasFirebaseStorage) {
+      showNotice('Firebase Storage is not configured yet for this deployment.');
+      return;
+    }
+
+    try {
+      const asset = await uploadTextToCloudStorage({
+        filename: sanitizeDownloadFilename(`${title}.txt`),
+        content: buildExportBlock(title, content, citations),
+        userId: user.uid,
+        folder,
+      });
+
+      showNotice(`Synced to Google Cloud Storage: ${asset.path}`);
+    } catch (error) {
+      showNotice(error instanceof Error ? error.message : 'Cloud sync failed.');
+    }
   };
 
   const runGeminiTask = async ({
@@ -431,6 +486,9 @@ Special concerns or constraints: ${planForm.concerns || 'Not provided'}`,
   const handleDocumentExplain = async () => {
     if (!docFile || docLoading) return;
 
+    setDocCloudPath('');
+    setDocCloudUrl('');
+
     await runGeminiTask({
       setLoading: setDocLoading,
       setError: setDocError,
@@ -438,6 +496,23 @@ Special concerns or constraints: ${planForm.concerns || 'Not provided'}`,
         const validationError = validateUploadedDocument(docFile);
         if (validationError) {
           throw new Error(validationError);
+        }
+
+        if (user?.uid && hasFirebaseStorage) {
+          setDocCloudLoading(true);
+
+          try {
+            const cloudAsset = await uploadFileToCloudStorage({
+              file: docFile,
+              userId: user.uid,
+              folder: 'action-center-documents',
+            });
+
+            setDocCloudPath(cloudAsset.path);
+            setDocCloudUrl(cloudAsset.downloadUrl);
+          } finally {
+            setDocCloudLoading(false);
+          }
         }
 
         const inlineData = await fileToInlineData(docFile);
@@ -565,8 +640,10 @@ Keep it practical and tell the user what they should verify with official source
             </p>
             <div className="mt-6 flex flex-wrap gap-3 text-sm text-muted-foreground">
               <span className="rounded-full border border-border bg-background/70 px-3 py-1.5">{labels.actionCenter.geminiOnly}</span>
-              <span className="rounded-full border border-border bg-background/70 px-3 py-1.5">{saveOriginLabel === 'Local browser save' ? labels.actionCenter.saveModeLocal : labels.actionCenter.saveModeHybrid}</span>
+              <span className="rounded-full border border-border bg-background/70 px-3 py-1.5">{getSaveOriginLabel(user?.uid) === 'Local browser save' ? labels.actionCenter.saveModeLocal : labels.actionCenter.saveModeHybrid}</span>
               <span className="rounded-full border border-border bg-background/70 px-3 py-1.5">{labels.actionCenter.zeroBudget}</span>
+              <span className="rounded-full border border-border bg-background/70 px-3 py-1.5">{isSignedIn ? 'Google Sign-In active' : 'Google Sign-In available'}</span>
+              <span className="rounded-full border border-border bg-background/70 px-3 py-1.5">{hasFirebaseStorage ? 'Cloud Storage ready' : 'Cloud Storage pending'}</span>
             </div>
           </div>
 
@@ -577,6 +654,33 @@ Keep it practical and tell the user what they should verify with official source
             </div>
             <div className={`${inputClass} flex items-center bg-card text-muted-foreground`}>{geminiLanguageLabel}</div>
             <div className="mt-3 text-xs text-muted-foreground">{labels.actionCenter.outputLanguageBody}</div>
+            <div className="mt-4 rounded-2xl border border-border bg-card p-4">
+              <div className="mb-3 text-sm font-semibold text-foreground">Google services</div>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2"><Cloud className="h-4 w-4 text-primary" /> Google Sign-In</span>
+                  <span>{authLoading ? 'Checking...' : isSignedIn ? 'Connected' : hasGoogleAuth ? 'Ready' : 'Setup needed'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2"><Database className="h-4 w-4 text-primary" /> Firestore sync</span>
+                  <span>{user?.uid ? 'User-scoped' : 'Local fallback'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2"><Cloud className="h-4 w-4 text-primary" /> Cloud Storage</span>
+                  <span>{hasFirebaseStorage ? 'Ready' : 'Setup needed'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Analytics</span>
+                  <span>{hasFirebaseAnalytics ? 'Tracking routes' : 'Setup needed'}</span>
+                </div>
+              </div>
+              {!isSignedIn && hasGoogleAuth && (
+                <button onClick={() => void handleGoogleSignIn()} className="mt-4 inline-flex items-center rounded-2xl border border-border px-4 py-2 text-sm font-semibold transition hover:border-primary/40 hover:bg-secondary">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  Connect Google account
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -588,6 +692,11 @@ Keep it practical and tell the user what they should verify with official source
         {saveNotice && (
           <div className="relative z-10 mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700" role="status" aria-live="polite">
             {saveNotice}
+          </div>
+        )}
+        {googleAuthError && (
+          <div className="relative z-10 mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">
+            {googleAuthError}
           </div>
         )}
       </section>
@@ -633,6 +742,7 @@ Keep it practical and tell the user what they should verify with official source
                   onCopy={() => void runCopy('Grounded answer', groundedAnswer, groundedCitations)}
                   onShare={() => void runShare('Grounded answer', groundedAnswer, groundedCitations)}
                   onDownload={() => runExport('Grounded answer', groundedAnswer, groundedCitations)}
+                  onCloudSync={() => void runCloudSync('Grounded answer', groundedAnswer, groundedCitations, 'grounded-answers')}
                 />
               </div>
             )}
@@ -682,6 +792,7 @@ Keep it practical and tell the user what they should verify with official source
                   onCopy={() => void runCopy('Voting plan', planResult)}
                   onShare={() => void runShare('Voting plan', planResult)}
                   onDownload={() => runExport('Voting plan', planResult)}
+                  onCloudSync={() => void runCloudSync('Voting plan', planResult, [], 'voting-plans')}
                 />
               </div>
             )}
@@ -743,6 +854,24 @@ Keep it practical and tell the user what they should verify with official source
                 {docLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileSearch className="mr-2 h-4 w-4" />}
                 Explain document
               </button>
+              {(docCloudLoading || docCloudPath || (!isSignedIn && hasGoogleAuth) || (isSignedIn && !hasFirebaseStorage)) && (
+                <div className="mt-4 rounded-2xl border border-border bg-background px-4 py-3 text-sm text-muted-foreground">
+                  {docCloudLoading && 'Backing up the source file to Google Cloud Storage...'}
+                  {!docCloudLoading && docCloudPath && (
+                    <div className="space-y-1">
+                      <div className="font-semibold text-foreground">Google Cloud backup created</div>
+                      <div className="truncate text-xs">{docCloudPath}</div>
+                      {docCloudUrl && (
+                        <a href={docCloudUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-primary hover:underline">
+                          Open cloud file
+                        </a>
+                      )}
+                    </div>
+                  )}
+                  {!docCloudLoading && !docCloudPath && !isSignedIn && hasGoogleAuth && 'Sign in with Google to back up uploaded documents to Cloud Storage.'}
+                  {!docCloudLoading && !docCloudPath && isSignedIn && !hasFirebaseStorage && 'Firebase Storage is not configured yet for this deployment.'}
+                </div>
+              )}
               {docError && <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">{docError}</div>}
               {docResult && (
                 <div className="mt-5">
@@ -762,6 +891,7 @@ Keep it practical and tell the user what they should verify with official source
                     onCopy={() => void runCopy('Document explanation', docResult)}
                     onShare={() => void runShare('Document explanation', docResult)}
                     onDownload={() => runExport('Document explanation', docResult)}
+                    onCloudSync={() => void runCloudSync('Document explanation', docResult, [], 'document-explanations')}
                   />
                 </div>
               )}
@@ -810,6 +940,7 @@ Keep it practical and tell the user what they should verify with official source
                     onCopy={() => void runCopy('Claim check', claimResult, claimCitations)}
                     onShare={() => void runShare('Claim check', claimResult, claimCitations)}
                     onDownload={() => runExport('Claim check', claimResult, claimCitations)}
+                    onCloudSync={() => void runCloudSync('Claim check', claimResult, claimCitations, 'claim-checks')}
                   />
                 </div>
               )}
@@ -854,6 +985,7 @@ Keep it practical and tell the user what they should verify with official source
                     onCopy={() => void runCopy('Ballot / manifesto explainer', ballotResult)}
                     onShare={() => void runShare('Ballot / manifesto explainer', ballotResult)}
                     onDownload={() => runExport('Ballot / manifesto explainer', ballotResult)}
+                    onCloudSync={() => void runCloudSync('Ballot / manifesto explainer', ballotResult, [], 'ballot-explainers')}
                   />
                 </div>
               )}
@@ -907,6 +1039,7 @@ Keep it practical and tell the user what they should verify with official source
                     onCopy={() => void runCopy('Scenario simulation', scenarioResult)}
                     onShare={() => void runShare('Scenario simulation', scenarioResult)}
                     onDownload={() => runExport('Scenario simulation', scenarioResult)}
+                    onCloudSync={() => void runCloudSync('Scenario simulation', scenarioResult, [], 'scenario-simulations')}
                   />
                 </div>
               )}
