@@ -27,6 +27,8 @@ export type CloudAsset = {
   downloadUrl: string;
 };
 
+const CLOUD_STORAGE_UNAVAILABLE_MESSAGE = 'Google Cloud Storage backup is unavailable until Firebase Storage is configured.';
+
 export const buildFirebaseConfig = (env: FirebaseEnv): FirebaseRuntimeConfig => ({
   apiKey: env.VITE_FIREBASE_API_KEY,
   authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -56,6 +58,7 @@ type AnalyticsBundle = {
   analytics: import('firebase/analytics').Analytics;
   logEvent: AnalyticsModule['logEvent'];
 };
+type AnalyticsValue = string | number | boolean;
 
 let analyticsPromise: Promise<AnalyticsBundle | null> | null = null;
 type AuthModule = typeof import('firebase/auth');
@@ -84,6 +87,8 @@ const mapGoogleUser = (user: import('firebase/auth').User | null): GoogleUserPro
     : null;
 
 const sanitizePathSegment = (value: string) => value.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'item';
+const buildCloudStoragePath = (folder: string, userId: string, filename: string, timestamp = Date.now()) =>
+  `${sanitizePathSegment(folder)}/${sanitizePathSegment(userId)}/${timestamp}-${sanitizePathSegment(filename)}`;
 
 const loadAuthBundle = () => {
   if (!app) {
@@ -124,6 +129,40 @@ const loadStorageBundle = () => {
   return storagePromise;
 };
 
+const getAnalyticsBundle = async () => {
+  const analyticsBundle = await initializeFirebaseAnalytics();
+
+  if (!analyticsBundle) {
+    return null;
+  }
+
+  return analyticsBundle;
+};
+
+const logAnalyticsEvent = async (
+  eventName: string,
+  params: Record<string, AnalyticsValue | null | undefined>,
+) => {
+  const analyticsBundle = await getAnalyticsBundle();
+
+  if (!analyticsBundle) {
+    return;
+  }
+
+  const safeParams = Object.fromEntries(Object.entries(params).filter((entry) => entry[1] !== null && entry[1] !== undefined));
+  analyticsBundle.logEvent(analyticsBundle.analytics, eventName, safeParams);
+};
+
+const getStorageBundleOrThrow = async () => {
+  const bundle = await loadStorageBundle();
+
+  if (!bundle) {
+    throw new Error(CLOUD_STORAGE_UNAVAILABLE_MESSAGE);
+  }
+
+  return bundle;
+};
+
 export const initializeFirebaseAnalytics = () => {
   if (!app || !firebaseConfig.measurementId || typeof window === 'undefined') {
     return Promise.resolve(null);
@@ -154,16 +193,17 @@ export const initializeFirebaseAnalytics = () => {
 };
 
 export const trackPageView = async (path: string, title?: string) => {
-  const analyticsBundle = await initializeFirebaseAnalytics();
-
-  if (!analyticsBundle) {
-    return;
-  }
-
-  analyticsBundle.logEvent(analyticsBundle.analytics, 'page_view', {
+  await logAnalyticsEvent('page_view', {
     page_path: path,
     page_title: title,
   });
+};
+
+export const trackFeatureEvent = async (
+  eventName: string,
+  params: Record<string, AnalyticsValue | null | undefined> = {},
+) => {
+  await logAnalyticsEvent(eventName, params);
 };
 
 export const subscribeToGoogleAuth = (callback: (user: GoogleUserProfile | null) => void) => {
@@ -225,14 +265,8 @@ export const uploadFileToCloudStorage = async ({
   userId: string;
   folder: string;
 }) => {
-  const bundle = await loadStorageBundle();
-
-  if (!bundle) {
-    throw new Error('Google Cloud Storage backup is unavailable until Firebase Storage is configured.');
-  }
-
-  const timestamp = Date.now();
-  const path = `${sanitizePathSegment(folder)}/${sanitizePathSegment(userId)}/${timestamp}-${sanitizePathSegment(file.name)}`;
+  const bundle = await getStorageBundleOrThrow();
+  const path = buildCloudStoragePath(folder, userId, file.name);
   const assetRef = bundle.module.ref(bundle.storage, path);
   await bundle.module.uploadBytes(assetRef, file, {
     contentType: file.type || 'application/octet-stream',
@@ -256,14 +290,8 @@ export const uploadTextToCloudStorage = async ({
   userId: string;
   folder: string;
 }) => {
-  const bundle = await loadStorageBundle();
-
-  if (!bundle) {
-    throw new Error('Google Cloud Storage backup is unavailable until Firebase Storage is configured.');
-  }
-
-  const timestamp = Date.now();
-  const path = `${sanitizePathSegment(folder)}/${sanitizePathSegment(userId)}/${timestamp}-${sanitizePathSegment(filename)}`;
+  const bundle = await getStorageBundleOrThrow();
+  const path = buildCloudStoragePath(folder, userId, filename);
   const assetRef = bundle.module.ref(bundle.storage, path);
   await bundle.module.uploadString(assetRef, content, 'raw', {
     contentType: 'text/plain;charset=utf-8',

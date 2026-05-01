@@ -18,6 +18,11 @@ export const sanitizeExternalUrl = (value: string) => {
     return null;
   }
 
+  const hasExplicitScheme = /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(trimmed);
+  if (hasExplicitScheme && !trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    return null;
+  }
+
   try {
     const candidate = trimmed.startsWith('http://') || trimmed.startsWith('https://') ? trimmed : `https://${trimmed}`;
     const parsed = new URL(candidate);

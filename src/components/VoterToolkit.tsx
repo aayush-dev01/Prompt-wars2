@@ -36,15 +36,18 @@ const VoterToolkit = () => {
   ];
 
   return (
-    <div className="bg-card border border-border rounded-3xl p-6 shadow-sm h-full flex flex-col">
-      <div className="mb-6">
-        <h3 className="text-xl font-bold mb-2">{labels.toolkit.title}</h3>
-        <p className="text-muted-foreground text-sm leading-relaxed">
+    <div className="feature-panel flex h-full flex-col rounded-[2rem] p-6">
+      <div className="relative z-10 mb-6">
+        <div className="mb-3 inline-flex rounded-full border border-border bg-background/75 px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+          Useful links
+        </div>
+        <h3 className="mb-2 text-2xl font-bold">{labels.toolkit.title}</h3>
+        <p className="text-sm leading-relaxed text-muted-foreground">
           {labels.toolkit.body}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 flex-grow">
+      <div className="relative z-10 grid flex-grow grid-cols-1 gap-4 sm:grid-cols-2">
         {tools.map((tool, index) => (
           <motion.a
             key={tool.title}
@@ -54,7 +57,7 @@ const VoterToolkit = () => {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.08 }}
-            className="group relative flex flex-col justify-between p-5 rounded-2xl border border-border bg-background hover:bg-secondary/40 hover:border-primary/40 transition-all shadow-sm hover:shadow-md overflow-hidden"
+            className="group relative flex flex-col justify-between overflow-hidden rounded-[1.6rem] border border-border bg-background/85 p-5 shadow-sm transition-all hover:-translate-y-1 hover:border-primary/30 hover:bg-secondary/40 hover:shadow-lg"
           >
             <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity" />
 

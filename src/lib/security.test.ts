@@ -11,6 +11,7 @@ describe('security helpers', () => {
   it('rejects unsafe urls', () => {
     expect(sanitizeExternalUrl('javascript:alert(1)')).toBeNull();
     expect(sanitizeExternalUrl('')).toBeNull();
+    expect(sanitizeExternalUrl('ftp://example.com/file.txt')).toBeNull();
   });
 
   it('drops citations with unsafe urls', () => {
@@ -30,8 +31,18 @@ describe('security helpers', () => {
   it('validates uploaded documents', () => {
     const validFile = new File(['hello'], 'notice.pdf', { type: 'application/pdf' });
     const invalidFile = new File(['hello'], 'script.exe', { type: 'application/x-msdownload' });
+    const oversizedFile = new File(['hello'], 'poster.pdf', { type: 'application/pdf' });
+
+    Object.defineProperty(oversizedFile, 'size', { value: 11 * 1024 * 1024 });
 
     expect(validateUploadedDocument(validFile)).toBeNull();
     expect(validateUploadedDocument(invalidFile)).toContain('PDF');
+    expect(validateUploadedDocument(oversizedFile)).toContain('10 MB');
+  });
+
+  it('accepts empty mime types when the file extension is allowed', () => {
+    const file = new File(['hello'], 'notice.txt', { type: '' });
+
+    expect(validateUploadedDocument(file)).toBeNull();
   });
 });

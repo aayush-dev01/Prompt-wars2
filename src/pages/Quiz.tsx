@@ -142,24 +142,39 @@ Create a short custom coaching plan.`,
 
   if (!started) {
     return (
-      <div className="mx-auto flex min-h-[calc(100vh-16rem)] max-w-4xl flex-col justify-center px-4 py-20 text-center">
-        <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="rounded-3xl border border-border bg-card p-12 shadow-xl">
-          <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-primary/10">
+      <div className="page-shell flex min-h-[calc(100vh-16rem)] max-w-5xl flex-col justify-center py-20 text-center">
+        <motion.div initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="feature-panel rounded-[2rem] p-8 shadow-xl md:p-12">
+          <div className="relative z-10">
+            <div className="mx-auto mb-4 inline-flex rounded-full border border-border bg-background/75 px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Knowledge check
+            </div>
+            <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-primary/10">
             <BookOpen className="h-12 w-12 text-primary" />
-          </div>
-          <h1 className="mb-6 text-4xl font-bold md:text-5xl">{labels.quiz.introTitle}</h1>
-          <p className="mx-auto mb-10 max-w-2xl text-xl leading-relaxed text-muted-foreground">
-            {labels.quiz.introBody}
-          </p>
+            </div>
+            <h1 className="mb-6 text-4xl font-bold md:text-5xl">{labels.quiz.introTitle}</h1>
+            <p className="mx-auto mb-10 max-w-2xl text-xl leading-relaxed text-muted-foreground">
+              {labels.quiz.introBody}
+            </p>
 
-          <div className="mx-auto mb-8 max-w-sm rounded-2xl border border-border bg-background p-4 text-left">
-            <div className="mb-2 text-sm font-semibold">{labels.quiz.coachingLanguage}</div>
-            <div className="w-full rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">{geminiLanguageLabel}</div>
-          </div>
+            <div className="mx-auto mb-8 grid max-w-3xl gap-4 md:grid-cols-3">
+              <div className="rounded-2xl border border-border bg-background/80 p-4 text-left">
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Format</div>
+                <div className="mt-2 text-sm font-semibold text-foreground">5 randomized questions</div>
+              </div>
+              <div className="rounded-2xl border border-border bg-background/80 p-4 text-left">
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">{labels.quiz.coachingLanguage}</div>
+                <div className="mt-2 text-sm font-semibold text-foreground">{geminiLanguageLabel}</div>
+              </div>
+              <div className="rounded-2xl border border-border bg-background/80 p-4 text-left">
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Outcome</div>
+                <div className="mt-2 text-sm font-semibold text-foreground">Instant explanations plus optional Gemini coaching</div>
+              </div>
+            </div>
 
-          <button onClick={startQuiz} className="inline-flex items-center rounded-full bg-primary px-8 py-4 text-lg font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform hover:scale-[1.02]">
-            {labels.quiz.start}
-          </button>
+            <button onClick={startQuiz} className="inline-flex items-center rounded-full bg-primary px-8 py-4 text-lg font-bold text-primary-foreground shadow-lg shadow-primary/30 transition-transform hover:scale-[1.02]">
+              {labels.quiz.start}
+            </button>
+          </div>
         </motion.div>
       </div>
     );
@@ -168,7 +183,7 @@ Create a short custom coaching plan.`,
   const activeQuestion = questions[currentQuestion];
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-16rem)] max-w-4xl flex-col px-4 py-12">
+    <div className="page-shell flex min-h-[calc(100vh-16rem)] max-w-4xl flex-col py-12">
       <AnimatePresence mode="wait">
         {!showResult ? (
           <motion.div key={activeQuestion.id} initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-grow flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-lg">
@@ -232,7 +247,7 @@ Create a short custom coaching plan.`,
             </div>
           </motion.div>
         ) : (
-          <motion.div key="result" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="rounded-3xl border border-border bg-card p-8 shadow-xl md:p-12">
+          <motion.div key="result" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="rounded-[2rem] border border-border bg-card p-8 shadow-xl md:p-12">
             <div className="mb-10 grid gap-8 lg:grid-cols-[1fr_1.2fr] lg:items-center">
               <div className="text-center">
                 <div className="relative mx-auto mb-8 h-32 w-32">

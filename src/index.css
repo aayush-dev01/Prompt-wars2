@@ -17,6 +17,7 @@
   --card: rgba(255, 252, 247, 0.9);
   --card-foreground: #132238;
   --radius: 1rem;
+  --shadow-color: 19 34 56;
 }
 
 .dark {
@@ -33,6 +34,7 @@
   --border: #314051;
   --card: rgba(15, 24, 36, 0.9);
   --card-foreground: #f8fafc;
+  --shadow-color: 0 0 0;
 }
 
 * {
@@ -51,9 +53,12 @@ body {
   background:
     radial-gradient(circle at top left, rgba(194, 65, 12, 0.12), transparent 28%),
     radial-gradient(circle at top right, rgba(22, 50, 79, 0.14), transparent 30%),
+    radial-gradient(circle at 50% 120%, rgba(214, 160, 93, 0.16), transparent 34%),
     linear-gradient(180deg, rgba(244, 239, 231, 0.45), transparent 30%),
     var(--background);
   transition: background-color 0.5s ease, color 0.5s ease;
+  text-rendering: optimizeLegibility;
+  min-width: 320px;
 }
 
 h1,
@@ -86,7 +91,7 @@ summary {
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid color-mix(in srgb, var(--border) 80%, white 20%);
-  box-shadow: 0 18px 60px rgba(19, 34, 56, 0.08);
+  box-shadow: 0 18px 60px rgba(var(--shadow-color) / 0.08);
 }
 
 .dark .glass {
@@ -101,7 +106,7 @@ summary {
   background-clip: text;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  background-image: linear-gradient(90deg, var(--primary), var(--accent));
+  background-image: linear-gradient(95deg, var(--primary), color-mix(in srgb, var(--accent) 86%, #f4c37d 14%));
 }
 
 .dark .text-gradient {
@@ -139,4 +144,52 @@ summary {
 .chat-scroll::-webkit-scrollbar-thumb {
   background: var(--primary);
   opacity: 0.2;
+}
+
+.page-shell {
+  width: min(100%, 82rem);
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+.section-heading {
+  max-width: 44rem;
+}
+
+.section-heading h1,
+.section-heading h2 {
+  margin: 0;
+}
+
+.feature-panel {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--border) 82%, white 18%);
+  background: color-mix(in srgb, var(--card) 90%, white 10%);
+  box-shadow: 0 18px 45px rgba(var(--shadow-color) / 0.08);
+}
+
+.feature-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--primary) 10%, transparent), transparent 40%),
+    radial-gradient(circle at top right, color-mix(in srgb, var(--accent) 18%, transparent), transparent 30%);
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

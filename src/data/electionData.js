@@ -364,7 +364,7 @@ export const VOTER_GUIDE_STEPS = [
   {
     step: 4,
     title: 'Prepare for Voting Day',
-    icon: '📅',
+    icon: '🗓',
     description: 'Reduce stress by knowing exactly where, when, and how you will vote.',
     checklist: [
       'Check your polling place or mail ballot instructions',

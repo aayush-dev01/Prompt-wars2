@@ -1,41 +1,60 @@
 import { useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
-import { CheckCircle2, ChevronRight } from 'lucide-react';
+import { CheckCircle2, ChevronRight, ShieldCheck, Timer, Vote } from 'lucide-react';
 import { ELECTION_PHASES } from '../data/electionData';
 import { useLanguage } from '../i18n/LanguageContext';
 
 const Process = () => {
   const [activePhase, setActivePhase] = useState(ELECTION_PHASES[0].id);
   const { labels } = useLanguage();
+  const activePhaseData = ELECTION_PHASES.find((phase) => phase.id === activePhase) || ELECTION_PHASES[0];
+  const overview = [
+    { label: 'Phases', value: String(ELECTION_PHASES.length), icon: Vote },
+    { label: 'Current focus', value: activePhaseData.title, icon: ShieldCheck },
+    { label: 'Typical span', value: activePhaseData.duration, icon: Timer },
+  ];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="text-center mb-16">
-        <h1 className="text-4xl md:text-5xl font-bold mb-4">{labels.process.title}</h1>
-        <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-          {labels.process.subtitle}
-        </p>
+    <div className="page-shell py-12 sm:py-16">
+      <div className="feature-panel mb-12 rounded-[2rem] px-6 py-8 sm:px-8 lg:px-10">
+        <div className="relative z-10 grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
+          <div className="section-heading">
+            <div className="mb-3 inline-flex rounded-full border border-border bg-background/75 px-3 py-2 text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">
+              Timeline walkthrough
+            </div>
+            <h1 className="text-4xl font-bold md:text-5xl">{labels.process.title}</h1>
+            <p className="mt-4 text-lg leading-8 text-muted-foreground">{labels.process.subtitle}</p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+            {overview.map(({ label, value, icon: Icon }) => (
+              <div key={label} className="rounded-3xl border border-border bg-background/75 p-4">
+                <Icon className="mb-3 h-5 w-5 text-primary" />
+                <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
+                <div className="mt-1 text-lg font-bold text-foreground">{value}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col lg:flex-row gap-12">
+      <div className="flex flex-col gap-12 lg:flex-row">
         <div className="lg:w-1/3">
-          <div className="sticky top-24 bg-card border border-border rounded-3xl p-4 shadow-sm">
-            <h3 className="text-lg font-semibold mb-6 px-4">{labels.process.phases}</h3>
-            <div className="space-y-2 relative">
-              <div className="absolute left-[2.25rem] top-6 bottom-6 w-0.5 bg-border -z-10" />
+          <div className="sticky top-24 rounded-[2rem] border border-border bg-card/90 p-4 shadow-lg shadow-slate-900/5">
+            <h2 className="mb-6 px-4 text-lg font-semibold">{labels.process.phases}</h2>
+            <div className="relative space-y-2">
+              <div className="absolute bottom-6 left-[2.25rem] top-6 -z-10 w-0.5 bg-border" />
 
               {ELECTION_PHASES.map((phase) => (
                 <button
                   key={phase.id}
                   onClick={() => setActivePhase(phase.id)}
-                  className={`w-full flex items-center p-3 rounded-2xl transition-all duration-200 text-left ${
-                    activePhase === phase.id
-                      ? 'bg-primary/10 ring-1 ring-primary/30 shadow-sm'
-                      : 'hover:bg-secondary'
+                  className={`flex w-full items-center rounded-2xl p-3 text-left transition-all duration-200 ${
+                    activePhase === phase.id ? 'bg-primary/10 ring-1 ring-primary/30 shadow-sm' : 'hover:bg-secondary'
                   }`}
                 >
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center text-lg z-10 shrink-0 shadow-sm transition-transform ${
+                    className={`z-10 flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg shadow-sm transition-transform ${
                       activePhase === phase.id ? 'scale-110 ring-2 ring-background' : ''
                     }`}
                     style={{
@@ -49,11 +68,11 @@ const Process = () => {
                     <div className={`font-semibold ${activePhase === phase.id ? 'text-primary' : ''}`}>
                       {phase.phase}. {phase.title}
                     </div>
-                    <div className="text-xs text-muted-foreground mt-0.5">{phase.duration}</div>
+                    <div className="mt-0.5 text-xs text-muted-foreground">{phase.duration}</div>
                   </div>
                   <ChevronRight
-                    className={`w-5 h-5 transition-transform ${
-                      activePhase === phase.id ? 'text-primary opacity-100 rotate-90 lg:rotate-0' : 'opacity-0 -translate-x-2'
+                    className={`h-5 w-5 transition-transform ${
+                      activePhase === phase.id ? 'rotate-90 text-primary opacity-100 lg:rotate-0' : '-translate-x-2 opacity-0'
                     }`}
                   />
                 </button>
@@ -73,33 +92,34 @@ const Process = () => {
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -20 }}
                     transition={{ duration: 0.3 }}
-                    className="bg-card border border-border rounded-3xl overflow-hidden shadow-lg"
+                    className="overflow-hidden rounded-[2rem] border border-border bg-card shadow-xl shadow-slate-900/5"
                   >
                     <div
-                      className="h-32 md:h-48 relative flex items-end p-6 md:p-8"
-                      style={{
-                        background: `linear-gradient(135deg, ${phase.color}ee, ${phase.color}55)`,
-                      }}
+                      className="relative flex h-40 items-end p-6 md:h-52 md:p-8"
+                      style={{ background: `linear-gradient(135deg, ${phase.color}ee, ${phase.color}55)` }}
                     >
                       <div className="absolute inset-0 bg-black/10 mix-blend-overlay" />
                       <div className="relative z-10 text-white">
-                        <div className="text-sm font-bold uppercase tracking-wider opacity-90 mb-1">
+                        <div className="mb-1 text-sm font-bold uppercase tracking-wider opacity-90">
                           Phase {phase.phase} • {phase.duration}
                         </div>
-                        <h2 className="text-3xl md:text-4xl font-bold">{phase.title}</h2>
+                        <h2 className="text-3xl font-bold md:text-4xl">{phase.title}</h2>
                       </div>
-                      <div className="absolute right-6 bottom-6 text-6xl md:text-8xl opacity-20 transform rotate-12 drop-shadow-lg">
+                      <div className="absolute bottom-6 right-6 text-6xl opacity-20 drop-shadow-lg md:text-8xl">
                         {phase.icon}
                       </div>
                     </div>
 
                     <div className="p-6 md:p-8">
-                      <h3 className="text-2xl font-bold mb-4 text-foreground/90">{phase.subtitle}</h3>
-                      <p className="text-lg text-muted-foreground leading-relaxed mb-8">{phase.description}</p>
+                      <div className="mb-8 rounded-3xl border border-border bg-background/70 p-5">
+                        <div className="text-xs font-bold uppercase tracking-[0.18em] text-muted-foreground">Why this stage matters</div>
+                        <h3 className="mt-2 text-2xl font-bold text-foreground/90">{phase.subtitle}</h3>
+                        <p className="mt-3 text-lg leading-relaxed text-muted-foreground">{phase.description}</p>
+                      </div>
 
                       <div className="mb-8">
-                        <h4 className="text-lg font-semibold mb-4 flex items-center">
-                          <span className="bg-primary/20 text-primary p-1.5 rounded-md mr-2">
+                        <h4 className="mb-4 flex items-center text-lg font-semibold">
+                          <span className="mr-2 rounded-md bg-primary/20 p-1.5 text-primary">
                             <CheckCircle2 size={18} />
                           </span>
                           {labels.process.keyActivities}
@@ -111,9 +131,9 @@ const Process = () => {
                               initial={{ opacity: 0, y: 10 }}
                               animate={{ opacity: 1, y: 0 }}
                               transition={{ delay: idx * 0.08 }}
-                              className="flex items-start bg-secondary/50 p-3 rounded-xl border border-border/50"
+                              className="flex items-start rounded-xl border border-border/50 bg-secondary/50 p-3"
                             >
-                              <span className="w-6 h-6 rounded-full bg-primary/20 text-primary flex items-center justify-center text-xs font-bold mr-3 mt-0.5 shrink-0">
+                              <span className="mr-3 mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-xs font-bold text-primary">
                                 {idx + 1}
                               </span>
                               <span className="text-foreground/80">{detail}</span>
@@ -122,10 +142,10 @@ const Process = () => {
                         </ul>
                       </div>
 
-                      <div className="bg-accent/10 border border-accent/20 rounded-2xl p-6 relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 rounded-full blur-2xl -mr-16 -mt-16 pointer-events-none" />
-                        <h4 className="text-sm font-bold uppercase text-accent mb-2 tracking-wider">{labels.process.didYouKnow}</h4>
-                        <p className="font-medium text-foreground relative z-10 italic">{phase.keyFact}</p>
+                      <div className="relative overflow-hidden rounded-2xl border border-accent/20 bg-accent/10 p-6">
+                        <div className="pointer-events-none absolute -right-16 -top-16 h-32 w-32 rounded-full bg-accent/10 blur-2xl" />
+                        <h4 className="mb-2 text-sm font-bold uppercase tracking-wider text-accent">{labels.process.didYouKnow}</h4>
+                        <p className="relative z-10 font-medium italic text-foreground">{phase.keyFact}</p>
                       </div>
                     </div>
                   </motion.div>

@@ -30,7 +30,7 @@ import { sanitizeCitations, sanitizeDownloadFilename, validateUploadedDocument }
 import { downloadTextFile, copyText, shareText } from '../lib/share';
 import { getSaveOriginLabel, loadSavedSessions, removeSession, saveSession, type SavedSession, type SavedSessionKind } from '../lib/sessionStore';
 import { useLanguage } from '../i18n/LanguageContext';
-import { hasFirebaseAnalytics, hasFirebaseStorage, hasGoogleAuth, signInWithGoogle, uploadFileToCloudStorage, uploadTextToCloudStorage } from '../lib/firebase';
+import { hasFirebaseAnalytics, hasFirebaseStorage, hasGoogleAuth, signInWithGoogle, trackFeatureEvent, uploadFileToCloudStorage, uploadTextToCloudStorage } from '../lib/firebase';
 import { useGoogleAuthState } from '../hooks/useGoogleAuthState';
 
 type GeminiTextResult = Awaited<ReturnType<typeof generateGeminiText>>;
@@ -320,9 +320,15 @@ const ActionCenter = () => {
 
     try {
       await signInWithGoogle();
+      void trackFeatureEvent('google_sign_in', {
+        surface: 'action_center',
+      });
       showNotice('Google account connected.');
     } catch (error) {
       setGoogleAuthError(error instanceof Error ? error.message : 'Google Sign-In could not be completed.');
+      void trackFeatureEvent('google_auth_error', {
+        surface: 'action_center',
+      });
     }
   };
 
@@ -351,6 +357,11 @@ const ActionCenter = () => {
       modelName,
       userId: user?.uid,
     });
+    void trackFeatureEvent('session_saved', {
+      kind,
+      has_google_user: Boolean(user?.uid),
+      has_citations: Boolean(citations?.length),
+    });
     setSavedSessions((current) => [saved, ...current.filter((item) => item.id !== saved.id)].slice(0, 40));
     showNotice(user?.uid ? `${title} saved to your Google-backed workspace.` : `${title} saved locally on this device.`);
   };
@@ -358,8 +369,15 @@ const ActionCenter = () => {
   const runCopy = async (title: string, content: string, citations: Citation[] = []) => {
     try {
       await copyText(buildExportBlock(title, content, citations));
+      void trackFeatureEvent('result_copied', {
+        title,
+        has_citations: Boolean(citations.length),
+      });
       showNotice(`${title} copied.`);
     } catch {
+      void trackFeatureEvent('copy_failed', {
+        title,
+      });
       showNotice('Copy failed on this device.');
     }
   };
@@ -367,23 +385,42 @@ const ActionCenter = () => {
   const runShare = async (title: string, content: string, citations: Citation[] = []) => {
     try {
       await shareText(title, buildExportBlock(title, content, citations));
+      void trackFeatureEvent('result_shared', {
+        title,
+        has_citations: Boolean(citations.length),
+      });
     } catch {
+      void trackFeatureEvent('share_failed', {
+        title,
+      });
       showNotice('Share is not available here.');
     }
   };
 
   const runExport = (title: string, content: string, citations: Citation[] = []) => {
     downloadTextFile(sanitizeDownloadFilename(`${title}.txt`), buildExportBlock(title, content, citations));
+    void trackFeatureEvent('result_exported', {
+      title,
+      has_citations: Boolean(citations.length),
+    });
     showNotice(`${title} exported.`);
   };
 
   const runCloudSync = async (title: string, content: string, citations: Citation[] = [], folder = 'action-center-exports') => {
     if (!user?.uid) {
+      void trackFeatureEvent('cloud_sync_blocked', {
+        reason: 'not_signed_in',
+        title,
+      });
       showNotice('Sign in with Google to sync this result to Cloud Storage.');
       return;
     }
 
     if (!hasFirebaseStorage) {
+      void trackFeatureEvent('cloud_sync_blocked', {
+        reason: 'storage_unavailable',
+        title,
+      });
       showNotice('Firebase Storage is not configured yet for this deployment.');
       return;
     }
@@ -396,8 +433,16 @@ const ActionCenter = () => {
         folder,
       });
 
+      void trackFeatureEvent('cloud_sync_success', {
+        title,
+        folder,
+      });
       showNotice(`Synced to Google Cloud Storage: ${asset.path}`);
     } catch (error) {
+      void trackFeatureEvent('cloud_sync_failed', {
+        title,
+        folder,
+      });
       showNotice(error instanceof Error ? error.message : 'Cloud sync failed.');
     }
   };
@@ -510,6 +555,9 @@ Special concerns or constraints: ${planForm.concerns || 'Not provided'}`,
 
             setDocCloudPath(cloudAsset.path);
             setDocCloudUrl(cloudAsset.downloadUrl);
+            void trackFeatureEvent('document_backup_created', {
+              file_type: docFile.type || 'unknown',
+            });
           } finally {
             setDocCloudLoading(false);
           }

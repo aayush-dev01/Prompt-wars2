@@ -1,9 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Cloud, Loader2, LogIn, LogOut, Menu, Moon, Sun, Vote, X } from 'lucide-react';
+import { ArrowRight, Cloud, Loader2, LogIn, LogOut, Menu, Moon, ShieldCheck, Sun, Vote, X } from 'lucide-react';
 import { useLanguage } from '../i18n/LanguageContext';
 import { languageLabels, supportedLanguages, type AppLanguage } from '../i18n/translations';
-import { hasGoogleAuth, signInWithGoogle, signOutFromGoogle } from '../lib/firebase';
+import { safeGetLocalStorageItem, safeSetLocalStorageItem } from '../lib/browserStorage';
+import { hasGoogleAuth, signInWithGoogle, signOutFromGoogle, trackFeatureEvent } from '../lib/firebase';
 import { useGoogleAuthState } from '../hooks/useGoogleAuthState';
 
 const Navbar = () => {
@@ -14,6 +15,7 @@ const Navbar = () => {
   const location = useLocation();
   const { language, setLanguage, labels } = useLanguage();
   const { user, loading: authLoading } = useGoogleAuthState();
+  const isHomePage = location.pathname === '/';
 
   const navLinks = [
     { name: labels.nav.home, path: '/' },
@@ -24,7 +26,7 @@ const Navbar = () => {
   ];
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
+    const savedTheme = safeGetLocalStorageItem('theme');
     const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     const shouldUseDark = savedTheme === 'dark' || (!savedTheme && systemPrefersDark);
 
@@ -33,7 +35,7 @@ const Navbar = () => {
 
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const handleChange = (event: MediaQueryListEvent) => {
-      if (!localStorage.getItem('theme')) {
+      if (!safeGetLocalStorageItem('theme')) {
         setIsDark(event.matches);
         document.documentElement.classList.toggle('dark', event.matches);
       }
@@ -51,10 +53,17 @@ const Navbar = () => {
     const newDark = !isDark;
     setIsDark(newDark);
     document.documentElement.classList.toggle('dark', newDark);
-    localStorage.setItem('theme', newDark ? 'dark' : 'light');
+    safeSetLocalStorageItem('theme', newDark ? 'dark' : 'light');
   };
 
   const isActive = (path: string) => location.pathname === path;
+  const statusLabel = useMemo(() => {
+    if (user) {
+      return 'Cloud sync ready';
+    }
+
+    return hasGoogleAuth ? 'Sign in for sync' : 'Local mode';
+  }, [user]);
 
   const handleGoogleAuth = async () => {
     if (!hasGoogleAuth || authBusy) {
@@ -67,25 +76,40 @@ const Navbar = () => {
     try {
       if (user) {
         await signOutFromGoogle();
+        void trackFeatureEvent('google_sign_out', {
+          surface: 'navbar',
+        });
       } else {
         await signInWithGoogle();
+        void trackFeatureEvent('google_sign_in', {
+          surface: 'navbar',
+        });
       }
     } catch (error) {
       setAuthError(error instanceof Error ? error.message : 'Google Sign-In could not be completed.');
+      void trackFeatureEvent('google_auth_error', {
+        surface: 'navbar',
+        had_user: Boolean(user),
+      });
     } finally {
       setAuthBusy(false);
     }
   };
 
   return (
-    <nav aria-label="Primary" className="fixed top-0 w-full z-50 glass border-b border-border transition-colors duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16 items-center">
-          <Link to="/" className="flex items-center gap-3">
-            <div className="bg-primary text-white p-2 rounded-xl shadow-lg shadow-primary/20">
+    <nav
+      aria-label="Primary"
+      className={`fixed top-0 z-50 w-full border-b border-border/80 transition-colors duration-300 ${
+        isHomePage ? 'glass' : 'bg-background/85 backdrop-blur-xl'
+      }`}
+    >
+      <div className="page-shell">
+        <div className="flex h-16 items-center justify-between gap-4">
+          <Link to="/" className="flex min-w-0 items-center gap-3">
+            <div className="rounded-2xl bg-primary p-2.5 text-white shadow-lg shadow-primary/20">
               <Vote size={22} />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="font-bold text-xl tracking-tight">ElectED</div>
               <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">
                 {labels.nav.tagline}
@@ -93,16 +117,23 @@ const Navbar = () => {
             </div>
           </Link>
 
+          <div className="hidden items-center gap-2 xl:flex">
+            <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-2 text-xs font-semibold text-muted-foreground">
+              <ShieldCheck size={14} className="text-emerald-600" />
+              <span>{statusLabel}</span>
+            </div>
+          </div>
+
           <div className="hidden md:flex items-center space-x-2">
             {navLinks.map((link) => (
               <Link
                 key={link.name}
                 to={link.path}
                 aria-current={isActive(link.path) ? 'page' : undefined}
-                className={`rounded-full px-4 py-2 text-sm font-semibold transition-colors ${
+                className={`rounded-full px-4 py-2 text-sm font-semibold transition-all ${
                   isActive(link.path)
-                    ? 'bg-primary text-primary-foreground shadow-md'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-secondary'
+                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/20'
+                    : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
                 }`}
               >
                 {link.name}
@@ -142,11 +173,19 @@ const Navbar = () => {
 
             <button
               onClick={toggleTheme}
-              className="ml-3 p-2 rounded-full hover:bg-secondary transition-colors"
+              className="ml-1 rounded-full p-2 transition-colors hover:bg-secondary"
               aria-label={isDark ? labels.nav.switchToLight : labels.nav.switchToDark}
             >
               {isDark ? <Sun size={20} /> : <Moon size={20} />}
             </button>
+
+            <Link
+              to="/action-center"
+              className="ml-2 inline-flex items-center gap-2 rounded-full bg-accent px-4 py-2 text-sm font-bold text-accent-foreground shadow-lg shadow-accent/20 transition hover:translate-y-[-1px] hover:shadow-xl"
+            >
+              Launch
+              <ArrowRight size={14} />
+            </Link>
           </div>
 
           <div className="md:hidden flex items-center gap-2">
@@ -193,8 +232,12 @@ const Navbar = () => {
       )}
 
       {isOpen && (
-        <div id="mobile-nav" className="md:hidden glass border-b border-border absolute w-full">
-          <div className="px-4 pt-2 pb-4 space-y-2">
+        <div id="mobile-nav" className="absolute w-full border-b border-border bg-background/95 shadow-2xl backdrop-blur-2xl md:hidden">
+          <div className="space-y-2 px-4 pb-4 pt-2">
+            <div className="mb-3 rounded-2xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground">
+              <div className="font-semibold text-foreground">Workspace status</div>
+              <div className="mt-1">{statusLabel}</div>
+            </div>
             {navLinks.map((link) => (
               <Link
                 key={link.name}
@@ -209,6 +252,13 @@ const Navbar = () => {
                 {link.name}
               </Link>
             ))}
+            <Link
+              to="/action-center"
+              className="flex items-center justify-between rounded-2xl bg-accent px-4 py-3 text-base font-bold text-accent-foreground"
+            >
+              <span>Launch Action Center</span>
+              <ArrowRight size={18} />
+            </Link>
             <button
               onClick={handleGoogleAuth}
               disabled={!hasGoogleAuth || authBusy || authLoading}

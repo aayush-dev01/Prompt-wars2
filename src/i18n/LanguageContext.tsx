@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { geminiLanguageLabels, languageLabels, supportedLanguages, translations, type AppLanguage } from './translations';
+import { safeGetLocalStorageItem, safeSetLocalStorageItem } from '../lib/browserStorage';
 
 type LanguageContextValue = {
   language: AppLanguage;
@@ -15,7 +16,7 @@ const STORAGE_KEY = 'elected-language';
 const LanguageContext = createContext<LanguageContextValue | undefined>(undefined);
 
 const detectInitialLanguage = (): AppLanguage => {
-  const saved = localStorage.getItem(STORAGE_KEY) as AppLanguage | null;
+  const saved = safeGetLocalStorageItem(STORAGE_KEY) as AppLanguage | null;
   if (saved && supportedLanguages.includes(saved)) {
     return saved;
   }
@@ -37,7 +38,7 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, language);
+    safeSetLocalStorageItem(STORAGE_KEY, language);
     document.documentElement.lang = language;
     document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
   }, [language]);

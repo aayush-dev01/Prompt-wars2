@@ -39,26 +39,26 @@ const UpcomingElections = () => {
     .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
   return (
-    <div className="bg-card border border-border rounded-3xl p-6 shadow-sm h-full flex flex-col">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="bg-primary/10 p-2 rounded-xl">
+    <div className="feature-panel flex h-full flex-col rounded-[2rem] p-6">
+      <div className="relative z-10 mb-3 flex items-center gap-3">
+        <div className="rounded-xl bg-primary/10 p-2">
           <Calendar className="text-primary w-6 h-6" />
         </div>
-        <h3 className="text-xl font-bold">{labels.elections.title}</h3>
+        <h3 className="text-2xl font-bold">{labels.elections.title}</h3>
       </div>
 
-      <p className="text-sm text-muted-foreground mb-6 leading-relaxed">
+      <p className="relative z-10 mb-6 text-sm leading-relaxed text-muted-foreground">
         {labels.elections.body}
       </p>
 
-      <div className="flex-grow space-y-4">
+      <div className="relative z-10 flex-grow space-y-4">
         {elections.map((election, index) => (
           <motion.div
             key={election.id}
             initial={{ opacity: 0, x: -10 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: index * 0.08 }}
-            className="flex items-start p-4 rounded-2xl hover:bg-secondary/50 border border-transparent hover:border-border transition-colors group"
+            className="group flex items-start rounded-[1.6rem] border border-transparent p-4 transition-colors hover:border-border hover:bg-secondary/45"
           >
             <div className="bg-background border border-border rounded-xl p-3 text-center min-w-[84px] mr-4 shadow-sm group-hover:border-primary/30 transition-colors">
               <div className="text-xs font-bold uppercase text-primary mb-1">
@@ -108,7 +108,7 @@ const UpcomingElections = () => {
         ))}
       </div>
 
-      <div className="mt-6 pt-4 border-t border-border flex justify-between items-center text-sm gap-4">
+      <div className="relative z-10 mt-6 flex items-center justify-between gap-4 border-t border-border pt-4 text-sm">
         <span className="text-muted-foreground italic">{labels.elections.footer}</span>
         <a
           href="https://www.idea.int/advanced-search"

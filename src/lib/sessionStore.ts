@@ -1,4 +1,5 @@
 import { addDoc, collection, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore';
+import { safeGetLocalStorageItem, safeSetLocalStorageItem } from './browserStorage';
 import { firestore, hasFirebaseConfig } from './firebase';
 import type { Citation, GeminiModelName } from './gemini';
 import { sanitizeCitations } from './security';
@@ -28,17 +29,18 @@ type NewSavedSession = Omit<SavedSession, 'id' | 'createdAt'>;
 
 const STORAGE_KEY = 'elected-saved-sessions';
 const COLLECTION_NAME = 'electEDSessions';
+const MAX_SAVED_SESSIONS = 40;
+const SAVED_SESSION_KINDS = new Set<SavedSessionKind>([
+  'grounded_answer',
+  'voting_plan',
+  'document_explainer',
+  'misinformation_check',
+  'ballot_explainer',
+  'scenario_simulation',
+]);
 
 const isSavedSessionKind = (value: unknown): value is SavedSessionKind =>
-  typeof value === 'string' &&
-  [
-    'grounded_answer',
-    'voting_plan',
-    'document_explainer',
-    'misinformation_check',
-    'ballot_explainer',
-    'scenario_simulation',
-  ].includes(value);
+  typeof value === 'string' && SAVED_SESSION_KINDS.has(value as SavedSessionKind);
 
 const sanitizeSavedSession = (value: unknown): SavedSession | null => {
   if (!value || typeof value !== 'object') {
@@ -77,7 +79,7 @@ const sanitizeSavedSession = (value: unknown): SavedSession | null => {
 
 const readLocalSessions = (): SavedSession[] => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = safeGetLocalStorageItem(STORAGE_KEY);
     if (!raw) {
       return [];
     }
@@ -90,14 +92,15 @@ const readLocalSessions = (): SavedSession[] => {
     return parsed
       .map((session) => sanitizeSavedSession(session))
       .filter((session): session is SavedSession => Boolean(session))
-      .slice(0, 40);
+      .sort((left, right) => right.createdAt - left.createdAt)
+      .slice(0, MAX_SAVED_SESSIONS);
   } catch {
     return [];
   }
 };
 
 const writeLocalSessions = (sessions: SavedSession[]) => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+  safeSetLocalStorageItem(STORAGE_KEY, JSON.stringify(sessions));
 };
 
 export const loadSavedSessions = async (userId?: string) => {
@@ -146,7 +149,7 @@ export const saveSession = async (session: NewSavedSession) => {
     id: crypto.randomUUID(),
     ...payload,
   } satisfies SavedSession;
-  const nextSessions = [localSession, ...readLocalSessions()].slice(0, 40);
+  const nextSessions = [localSession, ...readLocalSessions()].slice(0, MAX_SAVED_SESSIONS);
   writeLocalSessions(nextSessions);
   return localSession;
 };
