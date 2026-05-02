@@ -769,7 +769,7 @@ Keep it practical and tell the user what they should verify with official source
                 </div>
               </div>
               {!isSignedIn && hasGoogleAuth && (
-                <button onClick={() => void handleGoogleSignIn()} className="mt-4 inline-flex items-center rounded-2xl border border-border px-4 py-2 text-sm font-semibold transition hover:border-primary/40 hover:bg-secondary">
+                <button onClick={() => void handleSignIn()} className="mt-4 inline-flex items-center rounded-2xl border border-border px-4 py-2 text-sm font-semibold transition hover:border-primary/40 hover:bg-secondary">
                   <LogIn className="mr-2 h-4 w-4" />
                   Connect Google account
                 </button>
