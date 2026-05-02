@@ -32,6 +32,7 @@ import { getSaveOriginLabel, loadSavedSessions, removeSession, saveSession, type
 import { useLanguage } from '../i18n/LanguageContext';
 import { hasFirebaseAnalytics, hasFirebaseStorage, hasGoogleAuth, signInWithGoogle, trackFeatureEvent, uploadFileToCloudStorage, uploadTextToCloudStorage } from '../lib/firebase';
 import { useGoogleAuthState } from '../hooks/useGoogleAuthState';
+import { analyzeSentiment, type SentimentResult } from '../lib/googleCloud';
 
 type GeminiTextResult = Awaited<ReturnType<typeof generateGeminiText>>;
 
@@ -136,6 +137,7 @@ const ResultPanel = ({
   onShare,
   onDownload,
   onCloudSync,
+  sentiment,
 }: {
   title: string;
   modelName: GeminiModelName;
@@ -146,17 +148,32 @@ const ResultPanel = ({
   onShare?: () => void;
   onDownload?: () => void;
   onCloudSync?: () => void;
+  sentiment?: SentimentResult;
 }) => {
   const safeCitations = sanitizeCitations(citations);
 
   return (
-    <div className="rounded-3xl border border-border bg-card p-6 shadow-sm">
+    <div className="rounded-3xl border border-border bg-card p-6 shadow-sm" role="region" aria-label={`${title} results`}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-        <div>
+        <div className="flex flex-col gap-2">
           <h3 className="text-xl font-bold">{title}</h3>
-          <span className="mt-2 inline-flex rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary">
-            {modelName}
-          </span>
+          <div className="flex flex-wrap gap-2">
+            <span className="inline-flex rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary">
+              {modelName}
+            </span>
+            {sentiment && (
+              <span 
+                className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider border ${
+                  sentiment.isPositive ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                  sentiment.isNegative ? 'bg-rose-100 text-rose-800 border-rose-200' :
+                  'bg-slate-100 text-slate-800 border-slate-200'
+                }`}
+                title={`Sentiment score: ${sentiment.score}`}
+              >
+                {sentiment.isPositive ? 'Positive Tone' : sentiment.isNegative ? 'Serious/Cautionary Tone' : 'Neutral Tone'}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -241,6 +258,7 @@ const ActionCenter = () => {
   const [groundedModel, setGroundedModel] = useState<GeminiModelName>(GEMINI_MODELS[0]);
   const [groundedLoading, setGroundedLoading] = useState(false);
   const [groundedError, setGroundedError] = useState('');
+  const [groundedSentiment, setGroundedSentiment] = useState<SentimentResult | undefined>();
 
   const [planForm, setPlanForm] = useState({
     country: '',
@@ -254,6 +272,7 @@ const ActionCenter = () => {
   const [planModel, setPlanModel] = useState<GeminiModelName>(GEMINI_MODELS[0]);
   const [planLoading, setPlanLoading] = useState(false);
   const [planError, setPlanError] = useState('');
+  const [planSentiment, setPlanSentiment] = useState<SentimentResult | undefined>();
 
   const [docQuestion, setDocQuestion] = useState('Explain this document in plain language and tell me what I should do next.');
   const [docFile, setDocFile] = useState<File | null>(null);
@@ -502,10 +521,13 @@ Answer with practical steps and point to official verification where useful.`,
           temperature: 0.2,
           maxOutputTokens: 750,
         }),
-      onSuccess: (result) => {
+      onSuccess: async (result) => {
         setGroundedAnswer(result.text);
         setGroundedCitations(sanitizeCitations(result.citations));
         setGroundedModel(result.modelName);
+        
+        const sentiment = await analyzeSentiment(result.text, apiKeys[0]);
+        setGroundedSentiment(sentiment);
       },
     });
   };
@@ -532,9 +554,12 @@ Special concerns or constraints: ${planForm.concerns || 'Not provided'}`,
           temperature: 0.3,
           maxOutputTokens: 950,
         }),
-      onSuccess: (result) => {
+      onSuccess: async (result) => {
         setPlanResult(result.text);
         setPlanModel(result.modelName);
+
+        const sentiment = await analyzeSentiment(result.text, apiKeys[0]);
+        setPlanSentiment(sentiment);
       },
     });
   };
@@ -792,12 +817,13 @@ Keep it practical and tell the user what they should verify with official source
             </button>
             {groundedError && <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">{groundedError}</div>}
             {groundedAnswer && (
-              <div className="mt-5">
+              <div className="mt-5" aria-live="polite">
                 <ResultPanel
                   title="Grounded answer"
                   modelName={groundedModel}
                   content={groundedAnswer}
                   citations={groundedCitations}
+                  sentiment={groundedSentiment}
                   onSave={() =>
                     void persistSession({
                       kind: 'grounded_answer',
@@ -844,11 +870,12 @@ Keep it practical and tell the user what they should verify with official source
             </button>
             {planError && <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">{planError}</div>}
             {planResult && (
-              <div className="mt-5">
+              <div className="mt-5" aria-live="polite">
                 <ResultPanel
                   title="Personalized voting plan"
                   modelName={planModel}
                   content={planResult}
+                  sentiment={planSentiment}
                   onSave={() =>
                     void persistSession({
                       kind: 'voting_plan',

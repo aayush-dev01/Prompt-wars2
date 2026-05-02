@@ -155,4 +155,63 @@ describe('Quiz', () => {
     expect(await screen.findByText(/What You Already Know/)).toBeInTheDocument();
     expect(geminiMock.generateGeminiText).toHaveBeenCalledTimes(1);
   });
+
+  it('restarts the quiz and resets state', async () => {
+    renderQuiz();
+    fireEvent.click(screen.getByRole('button', { name: /start quiz/i }));
+    await screen.findByRole('heading', { level: 2 });
+    
+    // Quick exit to results (not possible via UI usually, but testing the logic)
+    // Actually just finish the quiz to see the restart button
+    for (let index = 0; index < mockQuestions.length; index += 1) {
+      fireEvent.click(screen.getAllByRole('button')[0]);
+      fireEvent.click(screen.getByRole('button', { name: /next question|see results/i }));
+    }
+    
+    const restartButton = await screen.findByRole('button', { name: /retake quiz/i });
+    fireEvent.click(restartButton);
+    
+    expect(await screen.findByText(/Question 1/i)).toBeInTheDocument();
+    expect(screen.queryByText('5/5')).not.toBeInTheDocument();
+  });
+
+  it('shows warning when requesting coaching without API keys', async () => {
+    geminiMock.getGeminiApiKeys.mockReturnValue([]);
+    renderQuiz();
+    fireEvent.click(screen.getByRole('button', { name: /start quiz/i }));
+
+    // Answer incorrectly to enable coaching
+    fireEvent.click(screen.getAllByRole('button')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /next question/i }));
+    
+    // Skip rest
+    for (let index = 1; index < mockQuestions.length; index += 1) {
+      fireEvent.click(screen.getAllByRole('button')[0]);
+      fireEvent.click(screen.getByRole('button', { name: /next question|see results/i }));
+    }
+
+    const coachingButton = await screen.findByRole('button', { name: /generate gemini coaching/i });
+    fireEvent.click(coachingButton);
+
+    expect(await screen.findByText(/Add `VITE_GEMINI_API_KEY`/i)).toBeInTheDocument();
+  });
+
+  it('displays error message when coaching generation fails', async () => {
+    geminiMock.generateGeminiText.mockRejectedValue(new Error('API Failure'));
+    renderQuiz();
+    fireEvent.click(screen.getByRole('button', { name: /start quiz/i }));
+
+    fireEvent.click(screen.getAllByRole('button')[1]);
+    fireEvent.click(screen.getByRole('button', { name: /next question/i }));
+    
+    for (let index = 1; index < mockQuestions.length; index += 1) {
+      fireEvent.click(screen.getAllByRole('button')[0]);
+      fireEvent.click(screen.getByRole('button', { name: /next question|see results/i }));
+    }
+
+    const coachingButton = await screen.findByRole('button', { name: /generate gemini coaching/i });
+    fireEvent.click(coachingButton);
+
+    expect(await screen.findByText(/API Failure/i)).toBeInTheDocument();
+  });
 });

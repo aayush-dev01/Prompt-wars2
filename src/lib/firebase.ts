@@ -1,5 +1,6 @@
 import { initializeApp, type FirebaseOptions } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { cloudLog } from './cloudLogging';
 
 type FirebaseEnv = {
   VITE_FIREBASE_API_KEY?: string;
@@ -100,13 +101,24 @@ const loadAuthBundle = () => {
       .then(async (module) => {
         const auth = module.getAuth(app);
         await module.setPersistence(auth, module.browserLocalPersistence);
+
+        // Handle redirect result from a previous signInWithRedirect call
+        try {
+          await module.getRedirectResult(auth);
+        } catch (redirectError) {
+          cloudLog.warn('Redirect result check failed (non-critical)', { error: String(redirectError) });
+        }
+
         return {
           auth,
           module,
           provider: new module.GoogleAuthProvider(),
         };
       })
-      .catch(() => null);
+      .catch((err) => {
+        cloudLog.error('Failed to load Firebase Auth bundle', { error: String(err) });
+        return null;
+      });
   }
 
   return authPromise;
@@ -199,6 +211,13 @@ export const trackPageView = async (path: string, title?: string) => {
   });
 };
 
+/**
+ * Tracks a custom feature event in Firebase Analytics.
+ * Automatically handles environments where Analytics is not configured.
+ * 
+ * @param {string} eventName - The name of the event to track.
+ * @param {Record<string, any>} params - Optional metadata for the event.
+ */
 export const trackFeatureEvent = async (
   eventName: string,
   params: Record<string, AnalyticsValue | null | undefined> = {},
@@ -231,6 +250,12 @@ export const subscribeToGoogleAuth = (callback: (user: GoogleUserProfile | null)
   };
 };
 
+/**
+ * Initiates Google Sign-In using a popup with a fallback to redirect.
+ * This ensures compatibility with environments that block popups (like Cloud Run).
+ * 
+ * @returns {Promise<GoogleUser | null>} The signed-in user or null if a redirect was triggered.
+ */
 export const signInWithGoogle = async () => {
   const bundle = await loadAuthBundle();
 
@@ -242,8 +267,21 @@ export const signInWithGoogle = async () => {
     prompt: 'select_account',
   });
 
-  const result = await bundle.module.signInWithPopup(bundle.auth, bundle.provider);
-  return mapGoogleUser(result.user);
+  try {
+    const result = await bundle.module.signInWithPopup(bundle.auth, bundle.provider);
+    cloudLog.info('Google Sign-In succeeded via popup');
+    return mapGoogleUser(result.user);
+  } catch (popupError: unknown) {
+    const code = (popupError as { code?: string })?.code;
+    // Fallback to redirect for environments that block popups or have internal errors
+    if (code === 'auth/internal-error' || code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
+      cloudLog.warn('Popup sign-in failed, falling back to redirect', { code });
+      await bundle.module.signInWithRedirect(bundle.auth, bundle.provider);
+      return null; // Redirect will reload the page
+    }
+    cloudLog.error('Google Sign-In failed', { error: String(popupError) });
+    throw popupError;
+  }
 };
 
 export const signOutFromGoogle = async () => {
@@ -279,6 +317,13 @@ export const uploadFileToCloudStorage = async ({
   } satisfies CloudAsset;
 };
 
+/**
+ * Uploads plain text content to Google Cloud Storage.
+ * Useful for exporting AI results and session data to a persistent cloud bucket.
+ * 
+ * @param {Object} params - Upload parameters.
+ * @returns {Promise<{path: string, downloadUrl: string}>} The storage path and public URL.
+ */
 export const uploadTextToCloudStorage = async ({
   filename,
   content,

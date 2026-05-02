@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
+import ErrorBoundary from './components/ErrorBoundary';
 import { trackPageView } from './lib/firebase';
 
 const Home = lazy(() => import('./pages/Home'));
@@ -36,6 +37,7 @@ const RouteTelemetry = () => {
 
 function App() {
   return (
+    <ErrorBoundary>
     <Router>
       <RouteTelemetry />
       <div className="relative min-h-screen overflow-x-hidden bg-background text-foreground transition-colors duration-300">
@@ -83,6 +85,7 @@ function App() {
         </div>
       </div>
     </Router>
+    </ErrorBoundary>
   );
 }
 

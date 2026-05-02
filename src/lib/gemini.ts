@@ -25,6 +25,12 @@ type PromptRequest = {
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
+/**
+ * Retrieves and deduplicates Gemini API keys from environment variables.
+ * Supports both single VITE_GEMINI_API_KEY and comma-separated VITE_GEMINI_API_KEYS.
+ * 
+ * @returns {string[]} An array of unique Gemini API keys.
+ */
 export const getGeminiApiKeys = () => {
   const multiKeyValue = (import.meta.env.VITE_GEMINI_API_KEYS || '').trim();
   const singleKeyValue = (import.meta.env.VITE_GEMINI_API_KEY || '').trim();
@@ -151,6 +157,14 @@ export const fileToInlineData = (file: File) =>
     reader.readAsDataURL(file);
   });
 
+/**
+ * Core utility to generate text using the Gemini API with automatic model and key fallbacks.
+ * Implements exponential backoff for retryable errors and switches keys/models on quota exhaustion.
+ * 
+ * @param {PromptRequest} params - The generation parameters including instructions, prompt, and model config.
+ * @returns {Promise<{text: string, modelName: GeminiModelName, citations: Citation[]}>} The generated text and metadata.
+ * @throws {Error} If all keys/models are exhausted or a non-retryable error occurs.
+ */
 export const generateGeminiText = async ({
   apiKey,
   systemInstruction,
