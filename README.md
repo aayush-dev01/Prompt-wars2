@@ -17,6 +17,7 @@ ElectED is a React + Vite civic education app focused on helping people understa
 - Scenario simulation for edge-case voting situations
 - Saved sessions with copy, share, and export support
 - Language switching for a more accessible experience
+- Google stack integration across Gemini 2.5, Google Search grounding, Firebase Auth, Firestore, Cloud Storage, and Analytics
 
 ## Tech stack
 
@@ -101,6 +102,7 @@ The built files are generated in `dist/`.
 - This project is designed to stay neutral and avoid partisan persuasion.
 - Gemini-powered answers can still vary by location and time, so users should verify deadlines and legal requirements with official election authorities.
 - Uploaded document support is validated before processing, with accepted formats including PDF, TXT, PNG, JPG, and WEBP.
+- When Firebase is configured, the app can track route analytics, support Google Sign-In, sync saved sessions through Firestore, and back up generated artifacts or uploaded documents to Cloud Storage.
 
 ## Status
 

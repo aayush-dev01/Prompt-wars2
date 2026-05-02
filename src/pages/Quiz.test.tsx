@@ -70,10 +70,15 @@ vi.mock('../data/electionData', () => ({
   QUIZ_QUESTIONS: mockQuestions,
 }));
 vi.mock('framer-motion', () => {
+  const motionProps = ['initial', 'animate', 'exit', 'transition', 'variants', 'whileHover', 'whileTap', 'whileDrag', 'whileFocus', 'whileInView', 'layoutId'];
   const motionProxy = new Proxy(
     {},
     {
-      get: (_, tag: string) => (props: Record<string, unknown>) => createElement(tag, props, props.children as ReactNode),
+      get: (_, tag: string) => ({ children, ...props }: Record<string, unknown>) => {
+        const validProps = { ...props };
+        motionProps.forEach(prop => delete validProps[prop]);
+        return createElement(tag, validProps, children as ReactNode);
+      },
     },
   );
 

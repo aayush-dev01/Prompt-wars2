@@ -503,7 +503,7 @@ const AIAssistant = () => {
                 </span>
                 <div className="mt-1 text-[10px] text-muted-foreground">
                   {hasVoiceInput || hasVoiceOutput
-                    ? `${hasVoiceInput ? labels.assistant.micAvailable : labels.assistant.micUnavailable} • ${voiceRepliesEnabled ? labels.assistant.voiceRepliesOn : labels.assistant.voiceRepliesOff}`
+                    ? `${hasVoiceInput ? labels.assistant.micAvailable : labels.assistant.micUnavailable} | ${voiceRepliesEnabled ? labels.assistant.voiceRepliesOn : labels.assistant.voiceRepliesOff}`
                     : 'Voice features depend on browser support.'}
                 </div>
               </div>

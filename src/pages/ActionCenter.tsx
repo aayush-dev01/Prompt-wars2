@@ -98,6 +98,15 @@ If Things Go Wrong
 Respond in the user's selected language.`;
 
 const supportedFileLabel = 'PDF, TXT, PNG, JPG, or WEBP up to 10 MB';
+const SUMMARY_SEPARATOR = ' | ';
+const GOOGLE_STACK_LABELS = [
+  'Gemini 2.5',
+  'Google Search grounding',
+  'Firebase Auth',
+  'Firestore sync',
+  'Cloud Storage backups',
+  'Analytics telemetry',
+];
 
 const cardClass = 'rounded-[2rem] border border-border bg-card/90 p-6 shadow-lg shadow-slate-900/5';
 const inputClass =
@@ -114,6 +123,8 @@ const buildExportBlock = (title: string, content: string, citations: Citation[] 
 
   return `${title}\n\n${content}${sourceText}`;
 };
+
+const joinSummaryParts = (...parts: Array<string | null | undefined>) => parts.filter(Boolean).join(SUMMARY_SEPARATOR);
 
 const ResultPanel = ({
   title,
@@ -692,6 +703,7 @@ Keep it practical and tell the user what they should verify with official source
               <span className="rounded-full border border-border bg-background/70 px-3 py-1.5">{labels.actionCenter.zeroBudget}</span>
               <span className="rounded-full border border-border bg-background/70 px-3 py-1.5">{isSignedIn ? 'Google Sign-In active' : 'Google Sign-In available'}</span>
               <span className="rounded-full border border-border bg-background/70 px-3 py-1.5">{hasFirebaseStorage ? 'Cloud Storage ready' : 'Cloud Storage pending'}</span>
+              <span className="rounded-full border border-border bg-background/70 px-3 py-1.5">{hasApiKey ? 'Grounded Google Search ready' : 'Grounded Google Search needs Gemini key'}</span>
             </div>
           </div>
 
@@ -704,7 +716,16 @@ Keep it practical and tell the user what they should verify with official source
             <div className="mt-3 text-xs text-muted-foreground">{labels.actionCenter.outputLanguageBody}</div>
             <div className="mt-4 rounded-2xl border border-border bg-card p-4">
               <div className="mb-3 text-sm font-semibold text-foreground">Google services</div>
+              <div className="mb-3 text-xs leading-6 text-muted-foreground">{GOOGLE_STACK_LABELS.join(SUMMARY_SEPARATOR)}</div>
               <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Gemini 2.5 models</span>
+                  <span>{hasApiKey ? 'Ready' : 'Setup needed'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2"><SearchCheck className="h-4 w-4 text-primary" /> Grounded Google Search</span>
+                  <span>{hasApiKey ? 'Ready' : 'Setup needed'}</span>
+                </div>
                 <div className="flex items-center justify-between gap-3">
                   <span className="inline-flex items-center gap-2"><Cloud className="h-4 w-4 text-primary" /> Google Sign-In</span>
                   <span>{authLoading ? 'Checking...' : isSignedIn ? 'Connected' : hasGoogleAuth ? 'Ready' : 'Setup needed'}</span>
@@ -832,7 +853,7 @@ Keep it practical and tell the user what they should verify with official source
                     void persistSession({
                       kind: 'voting_plan',
                       title: 'Voting plan',
-                      summary: `${planForm.country || 'Unknown country'} · ${planForm.electionType || 'Election plan'}`,
+                      summary: joinSummaryParts(planForm.country || 'Unknown country', planForm.electionType || 'Election plan'),
                       content: planResult,
                       modelName: planModel,
                     })
@@ -1079,7 +1100,7 @@ Keep it practical and tell the user what they should verify with official source
                       void persistSession({
                         kind: 'scenario_simulation',
                         title: 'Scenario simulation',
-                        summary: `${selectedScenario.title}${scenarioNotes ? ` · ${scenarioNotes.slice(0, 60)}` : ''}`,
+                        summary: joinSummaryParts(selectedScenario.title, scenarioNotes ? scenarioNotes.slice(0, 60) : ''),
                         content: scenarioResult,
                         modelName: scenarioModel,
                       })
@@ -1124,7 +1145,7 @@ Keep it practical and tell the user what they should verify with official source
                       <div className="text-xs font-bold uppercase tracking-wider text-primary">{TOOL_LABELS[session.kind]}</div>
                       <div className="mt-1 font-semibold text-foreground">{session.summary}</div>
                       <div className="mt-1 text-xs text-muted-foreground">
-                        {new Date(session.createdAt).toLocaleString()} · {session.language}
+                        {joinSummaryParts(new Date(session.createdAt).toLocaleString(), session.language)}
                       </div>
                     </div>
                     <button onClick={() => void deleteSession(session.id)} className="rounded-full p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground" aria-label="Delete saved session">
@@ -1191,3 +1212,4 @@ Keep it practical and tell the user what they should verify with official source
 };
 
 export default ActionCenter;
+

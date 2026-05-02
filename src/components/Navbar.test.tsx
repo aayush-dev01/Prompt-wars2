@@ -83,4 +83,33 @@ describe('Navbar', () => {
       surface: 'navbar',
     });
   });
+
+  it('toggles the theme when the button is clicked', () => {
+    renderNavbar();
+    const themeButtons = screen.getAllByRole('button', { name: /switch to dark/i });
+    fireEvent.click(themeButtons[0]);
+    expect(document.documentElement.classList.contains('dark')).toBe(true);
+    expect(localStorage.getItem('theme')).toBe('dark');
+  });
+
+  it('opens and closes the mobile menu', () => {
+    renderNavbar();
+    const menuButton = screen.getByRole('button', { name: /open menu/i });
+    fireEvent.click(menuButton);
+    expect(screen.getByRole('button', { name: /close menu/i })).toBeInTheDocument();
+    
+    const homeLinks = screen.getAllByRole('link', { name: /home/i });
+    expect(homeLinks.length).toBeGreaterThan(1);
+    
+    fireEvent.click(screen.getByRole('button', { name: /close menu/i }));
+    expect(screen.getByRole('button', { name: /open menu/i })).toBeInTheDocument();
+  });
+
+  it('changes language via the switchers', () => {
+    renderNavbar();
+    const switchers = screen.getAllByRole('combobox');
+    expect(switchers.length).toBe(2);
+    fireEvent.change(switchers[1], { target: { value: 'es' } });
+    expect((switchers[1] as HTMLSelectElement).value).toBe('es');
+  });
 });
