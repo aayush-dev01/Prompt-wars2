@@ -4,7 +4,7 @@ import { analyzeSentiment, translateText } from './googleCloud';
 describe('Google Cloud Utilities', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    global.fetch = vi.fn();
+    globalThis.fetch = vi.fn();
   });
 
   describe('Cloud Translation', () => {
@@ -19,7 +19,7 @@ describe('Google Cloud Utilities', () => {
     });
 
     it('translates text using the REST API', async () => {
-      (global.fetch as any).mockResolvedValueOnce({
+      (globalThis.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           data: {
@@ -30,14 +30,14 @@ describe('Google Cloud Utilities', () => {
 
       const result = await translateText('Hello', 'es', 'fake-key');
       expect(result).toBe('Hola');
-      expect(global.fetch).toHaveBeenCalledWith(
+      expect(globalThis.fetch).toHaveBeenCalledWith(
         'https://translation.googleapis.com/language/translate/v2?key=fake-key',
         expect.objectContaining({ method: 'POST' })
       );
     });
 
     it('falls back to original text on API failure', async () => {
-      (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+      (globalThis.fetch as any).mockRejectedValueOnce(new Error('Network error'));
       const result = await translateText('Hello', 'es', 'fake-key');
       expect(result).toBe('Hello');
     });
@@ -65,7 +65,7 @@ describe('Google Cloud Utilities', () => {
     });
 
     it('analyzes sentiment using the REST API', async () => {
-      (global.fetch as any).mockResolvedValueOnce({
+      (globalThis.fetch as any).mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           documentSentiment: {
@@ -83,7 +83,7 @@ describe('Google Cloud Utilities', () => {
     });
 
     it('falls back to heuristic on API failure', async () => {
-      (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+      (globalThis.fetch as any).mockRejectedValueOnce(new Error('Network error'));
       const result = await analyzeSentiment('This is awful.', 'fake-key');
       // Should fall back to heuristic and detect "awful" which is mapped to -0.5 in heuristic
       expect(result.isNegative).toBe(true);

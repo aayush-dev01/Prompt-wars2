@@ -79,7 +79,7 @@ export const runAIPipeline = async (options: {
       const result = await generateGeminiText({
         apiKey: geminiKeys,
         prompt,
-        systemInstruction,
+        systemInstruction: systemInstruction || '',
       });
       setCachedResponse(prompt, result.text);
       return { text: result.text, source: 'gemini', citations: result.citations, modelName: result.modelName };

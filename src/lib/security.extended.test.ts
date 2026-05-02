@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sanitizeCitations, sanitizeDownloadFilename, sanitizeExternalUrl, validateUploadedDocument } from './security';
+import { sanitizeCitations, sanitizeExternalUrl, validateUploadedDocument } from './security';
 
 describe('Security Utility Additions', () => {
   describe('sanitizeExternalUrl', () => {

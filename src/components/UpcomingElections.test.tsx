@@ -1,16 +1,15 @@
 // @vitest-environment jsdom
 import { render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../i18n/LanguageContext';
 import UpcomingElections from './UpcomingElections';
 
 vi.mock('framer-motion', () => {
-  const React = require('react');
   return {
     motion: {
       div: ({ children, ...props }: any) => {
         const { initial, animate, transition, ...validProps } = props;
-        return React.createElement('div', validProps, children);
+        return <div {...validProps}>{children}</div>;
       },
     },
   };

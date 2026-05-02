@@ -29,7 +29,7 @@ describe('session store firestore fallbacks', () => {
   });
 
   it('falls back to local save on firestore addDoc error', async () => {
-    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('uuid-123');
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue('123e4567-e89b-12d3-a456-426614174000');
     
     const session = await saveSession({
       kind: 'grounded_answer',
@@ -41,7 +41,7 @@ describe('session store firestore fallbacks', () => {
       userId: 'user-1',
     });
 
-    expect(session.id).toBe('uuid-123');
+    expect(session.id).toBe('123e4567-e89b-12d3-a456-426614174000');
   });
 
   it('falls back to local remove on firestore deleteDoc error', async () => {
