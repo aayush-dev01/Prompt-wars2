@@ -345,17 +345,17 @@ const ActionCenter = () => {
     }
   };
 
-  const handleGoogleSignIn = async () => {
-    setGoogleAuthError('');
-
+  const handleSignIn = async () => {
     try {
+      setGoogleAuthError('');
       await signInWithGoogle();
       void trackFeatureEvent('google_sign_in', {
         surface: 'action_center',
       });
       showNotice('Google account connected.');
-    } catch (error) {
-      setGoogleAuthError(error instanceof Error ? error.message : 'Google Sign-In could not be completed.');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      setGoogleAuthError(message);
       void trackFeatureEvent('google_auth_error', {
         surface: 'action_center',
       });

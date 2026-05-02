@@ -273,6 +273,15 @@ export const signInWithGoogle = async () => {
     return mapGoogleUser(result.user);
   } catch (popupError: unknown) {
     const code = (popupError as { code?: string })?.code;
+    
+    if (code === 'auth/unauthorized-domain') {
+      cloudLog.error('Firebase Auth: Domain not authorized', { 
+        domain: window.location.hostname,
+        fix: 'Add this domain to Firebase Console > Authentication > Settings > Authorized Domains'
+      });
+      throw new Error(`Unauthorized Domain: Please add "${window.location.hostname}" to your Firebase Console authorized domains list.`);
+    }
+
     // Fallback to redirect for environments that block popups or have internal errors
     if (code === 'auth/internal-error' || code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user') {
       cloudLog.warn('Popup sign-in failed, falling back to redirect', { code });
