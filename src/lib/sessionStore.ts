@@ -3,6 +3,7 @@ import { safeGetLocalStorageItem, safeSetLocalStorageItem } from './browserStora
 import { firestore, hasFirebaseConfig } from './firebase';
 import type { Citation, GeminiModelName } from './gemini';
 import { sanitizeCitations } from './security';
+import type { SentimentResult } from './googleCloud';
 
 export type SavedSessionKind =
   | 'grounded_answer'
@@ -23,6 +24,7 @@ export type SavedSession = {
   modelName: GeminiModelName;
   createdAt: number;
   userId?: string;
+  sentiment?: SentimentResult;
 };
 
 type NewSavedSession = Omit<SavedSession, 'id' | 'createdAt'>;
@@ -74,6 +76,7 @@ const sanitizeSavedSession = (value: unknown): SavedSession | null => {
     modelName: candidate.modelName as GeminiModelName,
     createdAt: candidate.createdAt,
     userId: candidate.userId,
+    sentiment: candidate.sentiment,
   };
 };
 
@@ -158,7 +161,7 @@ export const removeSession = async (id: string) => {
   if (firestore && hasFirebaseConfig) {
     try {
       await deleteDoc(doc(firestore, COLLECTION_NAME, id));
-      return;
+      // We continue to local deletion to ensure both are cleared if they exist.
     } catch {
       // Fall back to local deletion below.
     }

@@ -283,7 +283,8 @@ const ActionCenter = () => {
   const [docCloudPath, setDocCloudPath] = useState('');
   const [docCloudUrl, setDocCloudUrl] = useState('');
   const [docCloudLoading, setDocCloudLoading] = useState(false);
-
+  const [docSentiment, setDocSentiment] = useState<SentimentResult | undefined>();
+  
   const [claimText, setClaimText] = useState('');
   const [claimContext, setClaimContext] = useState('');
   const [claimResult, setClaimResult] = useState('');
@@ -291,19 +292,22 @@ const ActionCenter = () => {
   const [claimCitations, setClaimCitations] = useState<Citation[]>([]);
   const [claimLoading, setClaimLoading] = useState(false);
   const [claimError, setClaimError] = useState('');
-
+  const [claimSentiment, setClaimSentiment] = useState<SentimentResult | undefined>();
+  
   const [ballotText, setBallotText] = useState('');
   const [ballotResult, setBallotResult] = useState('');
   const [ballotModel, setBallotModel] = useState<GeminiModelName>(GEMINI_MODELS[0]);
   const [ballotLoading, setBallotLoading] = useState(false);
   const [ballotError, setBallotError] = useState('');
-
+  const [ballotSentiment, setBallotSentiment] = useState<SentimentResult | undefined>();
+  
   const [scenarioId, setScenarioId] = useState<(typeof SCENARIO_PRESETS)[number]['id']>(SCENARIO_PRESETS[0].id);
   const [scenarioNotes, setScenarioNotes] = useState('');
   const [scenarioResult, setScenarioResult] = useState('');
   const [scenarioModel, setScenarioModel] = useState<GeminiModelName>(GEMINI_MODELS[0]);
   const [scenarioLoading, setScenarioLoading] = useState(false);
   const [scenarioError, setScenarioError] = useState('');
+  const [scenarioSentiment, setScenarioSentiment] = useState<SentimentResult | undefined>();
 
   const selectedScenario = useMemo(
     () => SCENARIO_PRESETS.find((scenario) => scenario.id === scenarioId) || SCENARIO_PRESETS[0],
@@ -369,6 +373,7 @@ const ActionCenter = () => {
     content,
     citations,
     modelName,
+    sentiment,
   }: {
     kind: SavedSessionKind;
     title: string;
@@ -376,6 +381,7 @@ const ActionCenter = () => {
     content: string;
     citations?: Citation[];
     modelName: GeminiModelName;
+    sentiment?: SentimentResult;
   }) => {
     const saved = await saveSession({
       kind,
@@ -386,6 +392,7 @@ const ActionCenter = () => {
       language: geminiLanguageLabel,
       modelName,
       userId: user?.uid,
+      sentiment,
     });
     void trackFeatureEvent('session_saved', {
       kind,
@@ -613,9 +620,12 @@ If the file contains dates, deadlines, eligibility rules, or required documents,
           maxOutputTokens: 1150,
         });
       },
-      onSuccess: (result) => {
+      onSuccess: async (result) => {
         setDocResult(result.text);
         setDocModel(result.modelName);
+
+        const sentiment = await analyzeSentiment(result.text, apiKeys[0]);
+        setDocSentiment(sentiment);
       },
     });
   };
@@ -643,10 +653,13 @@ Check whether this claim is reliable for voters right now.`,
           temperature: 0.1,
           maxOutputTokens: 800,
         }),
-      onSuccess: (result) => {
+      onSuccess: async (result) => {
         setClaimResult(result.text);
         setClaimCitations(sanitizeCitations(result.citations));
         setClaimModel(result.modelName);
+
+        const sentiment = await analyzeSentiment(result.text, apiKeys[0]);
+        setClaimSentiment(sentiment);
       },
     });
   };
@@ -668,9 +681,12 @@ ${ballotText}`,
           temperature: 0.25,
           maxOutputTokens: 850,
         }),
-      onSuccess: (result) => {
+      onSuccess: async (result) => {
         setBallotResult(result.text);
         setBallotModel(result.modelName);
+
+        const sentiment = await analyzeSentiment(result.text, apiKeys[0]);
+        setBallotSentiment(sentiment);
       },
     });
   };
@@ -696,9 +712,12 @@ Keep it practical and tell the user what they should verify with official source
           temperature: 0.25,
           maxOutputTokens: 900,
         }),
-      onSuccess: (result) => {
+      onSuccess: async (result) => {
         setScenarioResult(result.text);
         setScenarioModel(result.modelName);
+
+        const sentiment = await analyzeSentiment(result.text, apiKeys[0]);
+        setScenarioSentiment(sentiment);
       },
     });
   };
@@ -832,6 +851,7 @@ Keep it practical and tell the user what they should verify with official source
                       content: groundedAnswer,
                       citations: groundedCitations,
                       modelName: groundedModel,
+                      sentiment: groundedSentiment,
                     })
                   }
                   onCopy={() => void runCopy('Grounded answer', groundedAnswer, groundedCitations)}
@@ -883,6 +903,7 @@ Keep it practical and tell the user what they should verify with official source
                       summary: joinSummaryParts(planForm.country || 'Unknown country', planForm.electionType || 'Election plan'),
                       content: planResult,
                       modelName: planModel,
+                      sentiment: planSentiment,
                     })
                   }
                   onCopy={() => void runCopy('Voting plan', planResult)}
@@ -975,6 +996,7 @@ Keep it practical and tell the user what they should verify with official source
                     title="Document explanation"
                     modelName={docModel}
                     content={docResult}
+                    sentiment={docSentiment}
                     onSave={() =>
                       void persistSession({
                         kind: 'document_explainer',
@@ -982,6 +1004,7 @@ Keep it practical and tell the user what they should verify with official source
                         summary: docFile?.name || 'Uploaded election document',
                         content: docResult,
                         modelName: docModel,
+                        sentiment: docSentiment,
                       })
                     }
                     onCopy={() => void runCopy('Document explanation', docResult)}
@@ -1023,6 +1046,7 @@ Keep it practical and tell the user what they should verify with official source
                     modelName={claimModel}
                     content={claimResult}
                     citations={claimCitations}
+                    sentiment={claimSentiment}
                     onSave={() =>
                       void persistSession({
                         kind: 'misinformation_check',
@@ -1031,6 +1055,7 @@ Keep it practical and tell the user what they should verify with official source
                         content: claimResult,
                         citations: claimCitations,
                         modelName: claimModel,
+                        sentiment: claimSentiment,
                       })
                     }
                     onCopy={() => void runCopy('Claim check', claimResult, claimCitations)}
@@ -1069,6 +1094,7 @@ Keep it practical and tell the user what they should verify with official source
                     title="Ballot / manifesto explainer"
                     modelName={ballotModel}
                     content={ballotResult}
+                    sentiment={ballotSentiment}
                     onSave={() =>
                       void persistSession({
                         kind: 'ballot_explainer',
@@ -1076,6 +1102,7 @@ Keep it practical and tell the user what they should verify with official source
                         summary: ballotText.slice(0, 110),
                         content: ballotResult,
                         modelName: ballotModel,
+                        sentiment: ballotSentiment,
                       })
                     }
                     onCopy={() => void runCopy('Ballot / manifesto explainer', ballotResult)}
@@ -1123,6 +1150,7 @@ Keep it practical and tell the user what they should verify with official source
                     title="Scenario simulation"
                     modelName={scenarioModel}
                     content={scenarioResult}
+                    sentiment={scenarioSentiment}
                     onSave={() =>
                       void persistSession({
                         kind: 'scenario_simulation',
@@ -1130,6 +1158,7 @@ Keep it practical and tell the user what they should verify with official source
                         summary: joinSummaryParts(selectedScenario.title, scenarioNotes ? scenarioNotes.slice(0, 60) : ''),
                         content: scenarioResult,
                         modelName: scenarioModel,
+                        sentiment: scenarioSentiment,
                       })
                     }
                     onCopy={() => void runCopy('Scenario simulation', scenarioResult)}
@@ -1171,8 +1200,21 @@ Keep it practical and tell the user what they should verify with official source
                     <div>
                       <div className="text-xs font-bold uppercase tracking-wider text-primary">{TOOL_LABELS[session.kind]}</div>
                       <div className="mt-1 font-semibold text-foreground">{session.summary}</div>
-                      <div className="mt-1 text-xs text-muted-foreground">
-                        {joinSummaryParts(new Date(session.createdAt).toLocaleString(), session.language)}
+                      <div className="mt-1 flex flex-wrap gap-2 items-center">
+                        <div className="text-xs text-muted-foreground">
+                          {joinSummaryParts(new Date(session.createdAt).toLocaleString(), session.language)}
+                        </div>
+                        {session.sentiment && (
+                          <span 
+                            className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${
+                              session.sentiment.isPositive ? 'bg-emerald-100 text-emerald-800 border-emerald-200' :
+                              session.sentiment.isNegative ? 'bg-rose-100 text-rose-800 border-rose-200' :
+                              'bg-slate-100 text-slate-800 border-slate-200'
+                            }`}
+                          >
+                            {session.sentiment.isPositive ? 'Positive' : session.sentiment.isNegative ? 'Serious' : 'Neutral'}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <button onClick={() => void deleteSession(session.id)} className="rounded-full p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground" aria-label="Delete saved session">
