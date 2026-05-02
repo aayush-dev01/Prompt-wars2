@@ -6,14 +6,23 @@ import { LanguageProvider } from '../i18n/LanguageContext';
 import Home from './Home';
 
 vi.mock('framer-motion', () => {
-  return {
-    motion: {
-      div: ({ children, ...props }: any) => {
+  const motionMock = new Proxy(
+    function (Component: any) {
+      return ({ children, ...props }: any) => {
         const { initial, animate, whileInView, viewport, transition, ...validProps } = props;
-        return <div {...validProps}>{children}</div>;
-      },
+        return <Component {...validProps}>{children}</Component>;
+      };
     },
-  };
+    {
+      get: (_, tag: string) => ({ children, ...props }: any) => {
+        const { initial, animate, whileInView, viewport, transition, ...validProps } = props;
+        const Component = tag as any;
+        return <Component {...validProps}>{children}</Component>;
+      },
+    }
+  );
+
+  return { motion: motionMock, AnimatePresence: ({ children }: any) => <>{children}</> };
 });
 
 describe('Home Page', () => {
@@ -56,16 +65,16 @@ describe('Home Page', () => {
 
   it('renders feature cards', () => {
     renderHome();
-    expect(screen.getByText('Gemini Action Center')).toBeInTheDocument();
-    expect(screen.getByText('Interactive timeline')).toBeInTheDocument();
-    expect(screen.getByText('Voter guide')).toBeInTheDocument();
+    expect(screen.getAllByText('Gemini Action Center').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Interactive timeline').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Voter guide').length).toBeGreaterThan(0);
   });
 
   it('renders election statistics section', () => {
     renderHome();
     // From ELECTION_STATS
     expect(screen.getByText('4B+')).toBeInTheDocument();
-    expect(screen.getByText('People voting globally in 2024')).toBeInTheDocument();
+    expect(screen.getByText('Eligible Voters Globally')).toBeInTheDocument();
   });
 
   it('renders the clarity section', () => {

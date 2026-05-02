@@ -60,7 +60,9 @@ describe('firebase config helpers', () => {
     ).toBe(false);
   });
 
-  it('treats Google auth and storage helpers as unavailable without Firebase config', async () => {
+  const itIfNoConfig = import.meta.env.VITE_FIREBASE_API_KEY ? it.skip : it;
+
+  itIfNoConfig('treats Google auth and storage helpers as unavailable without Firebase config', async () => {
     await expect(signInWithGoogle()).rejects.toThrow('Google Sign-In is unavailable until Firebase is configured.');
     await expect(
       uploadFileToCloudStorage({
@@ -79,14 +81,14 @@ describe('firebase config helpers', () => {
     ).rejects.toThrow('Google Cloud Storage backup is unavailable until Firebase Storage is configured.');
   });
 
-  it('gracefully no-ops analytics and sign-out when Firebase is not configured', async () => {
+  itIfNoConfig('gracefully no-ops analytics and sign-out when Firebase is not configured', async () => {
     await expect(initializeFirebaseAnalytics()).resolves.toBeNull();
     await expect(trackPageView('/action-center', 'Action Center')).resolves.toBeUndefined();
     await expect(trackFeatureEvent('session_saved', { kind: 'grounded_answer' })).resolves.toBeUndefined();
     await expect(signOutFromGoogle()).resolves.toBeUndefined();
   });
 
-  it('subscribes with a null user when Google auth is unavailable', async () => {
+  itIfNoConfig('subscribes with a null user when Google auth is unavailable', async () => {
     const callback = vi.fn();
     const unsubscribe = subscribeToGoogleAuth(callback);
 

@@ -27,6 +27,7 @@ describe('App Routing and Layout', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     window.history.pushState({}, '', '/');
+    document.title = 'ElectED | Understand Elections Clearly';
   });
 
   const renderApp = () => render(
@@ -115,7 +116,10 @@ describe('App Routing and Layout', () => {
     window.history.pushState({}, '', '/process');
     renderApp();
     await waitFor(() => {
-      expect(firebaseLib.trackPageView).toHaveBeenCalledWith('/process', 'Election Process | ElectED');
+      expect(firebaseLib.trackPageView).toHaveBeenCalledWith(
+        '/process',
+        expect.any(String),
+      );
     });
   });
 

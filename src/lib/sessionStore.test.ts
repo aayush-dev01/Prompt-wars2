@@ -2,6 +2,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { loadSavedSessions, removeSession, saveSession } from './sessionStore';
 
+vi.mock('./firebase', () => ({
+  hasFirebaseConfig: false,
+  firestore: null,
+}));
+
 describe('session store local fallback', () => {
   beforeEach(() => {
     localStorage.clear();
